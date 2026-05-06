@@ -1,0 +1,79 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/anamdb",
+    "crates/anam-cli",
+]
+
+[workspace.package]
+version = "0.1.0-alpha"
+edition = "2024"
+authors = ["NexSys Consulting (NSC)"]
+license = "Apache-2.0"
+repository = "https://github.com/nexsys-consulting/anamdb"
+description = "The AI-Native, Differentiable Logic Kernel for Autonomous Agents"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Arrow / DataFusion — let DataFusion drive arrow version
+datafusion = "53"
+datafusion-expr = "53"
+datafusion-physical-plan = "53"
+datafusion-physical-expr = "53"
+datafusion-common = "53"
+datafusion-execution = "53"
+
+# Storage — lance 4.x aligns with arrow 58+
+lance = "4"
+object_store = "0.11"
+url = "2"
+
+# Inference
+ort = { version = "2.0.0-rc.12", features = ["cuda", "coreml"] }
+
+# GPU Dispatch
+cudarc = { version = "0.19" }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+
+# HTTP (NL-to-Datalog LLM calls)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+rustyline = "15"
+comfy-table = "7"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Utilities
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+parking_lot = "0.12"
+dashmap = "6"
+bytes = "1"
+rand = "0.8"
+
+# Testing / Benchmarks
+criterion = { version = "0.5", features = ["async_tokio"] }
+tempfile = "3"
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
