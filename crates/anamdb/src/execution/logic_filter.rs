@@ -5,7 +5,6 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion_common::Result as DfResult;
@@ -56,12 +55,8 @@ impl LogicFilterExec {
 }
 
 impl DisplayAs for LogicFilterExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "LogicFilterExec: rule={}", self.rule_name)
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LogicFilterExec: rule={}", self.rule_name)
     }
 }
 
@@ -118,15 +113,9 @@ impl ExecutionPlan for LogicFilterExec {
                             rule = %rule,
                             "LogicFilterExec: evaluating batch"
                         );
-                        // Add facts temporarily and evaluate.
-                        // For the MVP, we pass the batch through the logic engine's
-                        // condition evaluator.
                         let engine_read = engine.read();
                         match engine_read.evaluate(&rule) {
-                            Ok(results) => {
-                                // Return first result batch if available.
-                                results.into_iter().next().map(Ok)
-                            }
+                            Ok(results) => results.into_iter().next().map(Ok),
                             Err(e) => Some(Err(
                                 datafusion_common::DataFusionError::External(Box::new(e))
                             )),

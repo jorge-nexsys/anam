@@ -12,7 +12,7 @@ pub enum AnamError {
 
     /// Arrow / DataFusion interop failure.
     #[error("arrow error: {0}")]
-    Arrow(#[from] arrow::error::ArrowError),
+    Arrow(#[from] datafusion::arrow::error::ArrowError),
 
     /// DataFusion planning or execution error.
     #[error("datafusion error: {0}")]

@@ -3,21 +3,21 @@
 //! Supports `AS OF 'timestamp'` via Lance's built-in snapshot versioning.
 
 use std::any::Any;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
 use datafusion::catalog::TableProvider;
+use datafusion::datasource::memory::MemTable;
 use datafusion::datasource::TableType;
-use datafusion::execution::context::SessionState;
 use datafusion::logical_expr::Expr;
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion_physical_plan::memory::MemoryExec;
 use dashmap::DashMap;
-use lance::dataset::Dataset;
-use tracing::{debug, info, instrument};
+use futures::TryStreamExt;
+use lance::Dataset;
+use tracing::{info, instrument};
 
 use crate::core::error::{AnamError, Result};
 
@@ -45,12 +45,34 @@ impl LanceTableManager {
             .await
             .map_err(|e| AnamError::Lance(format!("failed to open dataset at '{path}': {e}")))?;
 
-        let schema = Arc::new(dataset.schema().into());
-        let provider = Arc::new(LanceTableProvider {
-            path: PathBuf::from(path),
-            dataset: Arc::new(tokio::sync::RwLock::new(dataset)),
-            schema,
-        });
+        let lance_schema = dataset.schema();
+        let arrow_fields: Vec<datafusion::arrow::datatypes::Field> = lance_schema
+            .fields
+            .iter()
+            .map(|f| {
+                datafusion::arrow::datatypes::Field::new(
+                    &f.name,
+                    lance_to_arrow_dtype(&f.data_type()),
+                    f.nullable,
+                )
+            })
+            .collect();
+        let schema: SchemaRef = Arc::new(datafusion::arrow::datatypes::Schema::new(arrow_fields));
+
+        // Read all data into memory for the MVP.
+        let mut scanner = dataset.scan();
+        let batches: Vec<RecordBatch> = scanner
+            .try_into_stream()
+            .await
+            .map_err(|e| AnamError::Lance(format!("scan failed: {e}")))?
+            .try_collect()
+            .await
+            .map_err(|e: lance::Error| AnamError::Lance(format!("collect failed: {e}")))?;
+
+        let provider = Arc::new(
+            MemTable::try_new(schema, vec![batches])
+                .map_err(|e| AnamError::DataFusion(e))?
+        );
 
         self.datasets
             .insert(path.to_string(), PathBuf::from(path));
@@ -75,12 +97,33 @@ impl LanceTableManager {
                 ))
             })?;
 
-        let schema = Arc::new(dataset.schema().into());
-        let provider = Arc::new(LanceTableProvider {
-            path: PathBuf::from(path),
-            dataset: Arc::new(tokio::sync::RwLock::new(dataset)),
-            schema,
-        });
+        let lance_schema = dataset.schema();
+        let arrow_fields: Vec<datafusion::arrow::datatypes::Field> = lance_schema
+            .fields
+            .iter()
+            .map(|f| {
+                datafusion::arrow::datatypes::Field::new(
+                    &f.name,
+                    lance_to_arrow_dtype(&f.data_type()),
+                    f.nullable,
+                )
+            })
+            .collect();
+        let schema: SchemaRef = Arc::new(datafusion::arrow::datatypes::Schema::new(arrow_fields));
+
+        let mut scanner = dataset.scan();
+        let batches: Vec<RecordBatch> = scanner
+            .try_into_stream()
+            .await
+            .map_err(|e| AnamError::Lance(format!("scan failed: {e}")))?
+            .try_collect()
+            .await
+            .map_err(|e: lance::Error| AnamError::Lance(format!("collect failed: {e}")))?;
+
+        let provider = Arc::new(
+            MemTable::try_new(schema, vec![batches])
+                .map_err(|e| AnamError::DataFusion(e))?
+        );
 
         Ok(provider)
     }
@@ -100,91 +143,28 @@ impl Default for LanceTableManager {
     }
 }
 
-/// A DataFusion `TableProvider` backed by a Lance dataset.
-struct LanceTableProvider {
-    path: PathBuf,
-    dataset: Arc<tokio::sync::RwLock<Dataset>>,
-    schema: SchemaRef,
-}
-
-impl std::fmt::Debug for LanceTableProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LanceTableProvider")
-            .field("path", &self.path)
-            .finish()
+/// Convert a Lance data type to an Arrow data type.
+fn lance_to_arrow_dtype(dt: &lance::datatypes::DataType) -> datafusion::arrow::datatypes::DataType {
+    use datafusion::arrow::datatypes::DataType;
+    // Lance data types map to arrow fairly directly.
+    // For the MVP we handle the most common types.
+    match dt {
+        lance::datatypes::DataType::Boolean => DataType::Boolean,
+        lance::datatypes::DataType::Int8 => DataType::Int8,
+        lance::datatypes::DataType::Int16 => DataType::Int16,
+        lance::datatypes::DataType::Int32 => DataType::Int32,
+        lance::datatypes::DataType::Int64 => DataType::Int64,
+        lance::datatypes::DataType::UInt8 => DataType::UInt8,
+        lance::datatypes::DataType::UInt16 => DataType::UInt16,
+        lance::datatypes::DataType::UInt32 => DataType::UInt32,
+        lance::datatypes::DataType::UInt64 => DataType::UInt64,
+        lance::datatypes::DataType::Float16 => DataType::Float16,
+        lance::datatypes::DataType::Float32 => DataType::Float32,
+        lance::datatypes::DataType::Float64 => DataType::Float64,
+        lance::datatypes::DataType::Utf8 => DataType::Utf8,
+        lance::datatypes::DataType::Binary => DataType::Binary,
+        lance::datatypes::DataType::Date32 => DataType::Date32,
+        lance::datatypes::DataType::Date64 => DataType::Date64,
+        _ => DataType::Binary, // fallback for unsupported types
     }
 }
-
-#[async_trait]
-impl TableProvider for LanceTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn table_type(&self) -> TableType {
-        TableType::Base
-    }
-
-    async fn scan(
-        &self,
-        state: &dyn datafusion::catalog::Session,
-        projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
-    ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        let dataset = self.dataset.read().await;
-
-        // Build a Lance scanner.
-        let mut scanner = dataset.scan();
-
-        // Apply projection.
-        if let Some(proj) = projection {
-            let field_names: Vec<String> = proj
-                .iter()
-                .filter_map(|&i| self.schema.field(i).name().to_string().into())
-                .collect();
-            if !field_names.is_empty() {
-                scanner.project(&field_names)
-                    .map_err(|e| datafusion_common::DataFusionError::External(
-                        Box::new(AnamError::Lance(e.to_string()))
-                    ))?;
-            }
-        }
-
-        // Apply limit.
-        if let Some(lim) = limit {
-            scanner.limit(lim, None)
-                .map_err(|e| datafusion_common::DataFusionError::External(
-                    Box::new(AnamError::Lance(e.to_string()))
-                ))?;
-        }
-
-        // Execute the scan and collect batches.
-        let record_batches: Vec<RecordBatch> = scanner
-            .try_into_stream()
-            .await
-            .map_err(|e| datafusion_common::DataFusionError::External(
-                Box::new(AnamError::Lance(e.to_string()))
-            ))?
-            .try_collect()
-            .await
-            .map_err(|e| datafusion_common::DataFusionError::External(
-                Box::new(AnamError::Lance(e.to_string()))
-            ))?;
-
-        // Wrap in a MemoryExec for DataFusion.
-        let exec = MemoryExec::try_new(
-            &[record_batches],
-            self.schema.clone(),
-            projection.cloned(),
-        )?;
-
-        Ok(Arc::new(exec))
-    }
-}
-
-use futures::TryStreamExt;

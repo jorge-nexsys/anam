@@ -4,7 +4,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use datafusion::arrow::array::{ArrayRef, BinaryArray, RecordBatch};
+use datafusion::arrow::array::{Array, ArrayRef, BinaryArray, RecordBatch};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion_common::Result as DfResult;
@@ -67,16 +67,12 @@ impl ProvenanceExec {
 }
 
 impl DisplayAs for ProvenanceExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "ProvenanceExec: mode={:?}, model={}, func={}",
-                    self.provenance_mode, self.model_ver_id, self.func_id
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ProvenanceExec: mode={:?}, model={}, func={}",
+            self.provenance_mode, self.model_ver_id, self.func_id
+        )
     }
 }
 
@@ -138,7 +134,7 @@ impl ExecutionPlan for ProvenanceExec {
                                     vec![1u8] // EXISTS = true
                                 }
                                 ProvenanceMode::Probability => {
-                                    1.0_f64.to_le_bytes().to_vec() // Full confidence from source
+                                    1.0_f64.to_le_bytes().to_vec()
                                 }
                                 ProvenanceMode::Polynomial => {
                                     let token = ProvenanceToken {
@@ -154,8 +150,7 @@ impl ExecutionPlan for ProvenanceExec {
                         .collect();
 
                     let prov_refs: Vec<&[u8]> = prov_bytes.iter().map(|b| b.as_slice()).collect();
-                    let prov_array: ArrayRef =
-                        Arc::new(BinaryArray::from(prov_refs));
+                    let prov_array: ArrayRef = Arc::new(BinaryArray::from(prov_refs));
 
                     // Append provenance column to existing batch.
                     let mut columns: Vec<ArrayRef> = (0..batch.num_columns())

@@ -1,12 +1,13 @@
 //! Data ingestion pipelines: convert CSV, Parquet, and JSON into Lance datasets.
 
-use std::path::Path;
 use std::sync::Arc;
 
-use datafusion::arrow::array::RecordBatch;
+use arrow_array::RecordBatch;
+use arrow_array::RecordBatchIterator;
+use arrow_schema::Schema;
 use datafusion::arrow::csv::ReaderBuilder as CsvReaderBuilder;
-use datafusion::arrow::datatypes::Schema;
-use lance::dataset::{Dataset, WriteMode, WriteParams};
+use lance::dataset::{WriteMode, WriteParams};
+use lance::Dataset;
 use tracing::{info, instrument};
 
 use crate::core::error::{AnamError, Result};
@@ -19,7 +20,7 @@ pub async fn ingest_csv(csv_path: &str, lance_path: &str) -> Result<()> {
     let file = std::fs::File::open(csv_path).map_err(AnamError::Io)?;
 
     // Infer schema from the first 100 rows.
-    let (schema, _) = arrow::csv::reader::Format::default()
+    let (schema, _) = datafusion::arrow::csv::reader::Format::default()
         .with_header(true)
         .infer_schema(&file, Some(100))
         .map_err(AnamError::Arrow)?;
@@ -41,8 +42,8 @@ pub async fn ingest_csv(csv_path: &str, lance_path: &str) -> Result<()> {
         return Err(AnamError::Lance("CSV file produced no record batches".into()));
     }
 
-    // Write to Lance.
-    let reader = lance::arrow::RecordBatchIterator::new(
+    // Write to Lance using RecordBatchIterator.
+    let batch_reader = RecordBatchIterator::new(
         batches.into_iter().map(Ok),
         schema,
     );
@@ -52,7 +53,7 @@ pub async fn ingest_csv(csv_path: &str, lance_path: &str) -> Result<()> {
         ..Default::default()
     };
 
-    Dataset::write(reader, lance_path, Some(params))
+    Dataset::write(batch_reader, lance_path, Some(params))
         .await
         .map_err(|e| AnamError::Lance(format!("failed to write Lance dataset: {e}")))?;
 
@@ -78,7 +79,7 @@ pub async fn ingest_batches(
         return Err(AnamError::Lance("no record batches to ingest".into()));
     }
 
-    let reader = lance::arrow::RecordBatchIterator::new(
+    let batch_reader = RecordBatchIterator::new(
         batches.into_iter().map(Ok),
         schema,
     );
@@ -88,7 +89,7 @@ pub async fn ingest_batches(
         ..Default::default()
     };
 
-    Dataset::write(reader, lance_path, Some(params))
+    Dataset::write(batch_reader, lance_path, Some(params))
         .await
         .map_err(|e| AnamError::Lance(format!("failed to write Lance dataset: {e}")))?;
 

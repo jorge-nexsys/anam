@@ -6,13 +6,14 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::array::{Array, BinaryArray, RecordBatch};
 use datafusion::prelude::*;
 use parking_lot::RwLock;
 use tracing::{info, instrument};
 
 use crate::core::error::{AnamError, Result};
-use crate::core::provenance::ProvenanceMode;
-use crate::execution::dispatcher::{DevicePool, DeviceType};
+use crate::core::provenance::{PolynomialSemiring, ProvenanceMode, Semiring};
+use crate::execution::dispatcher::DevicePool;
 use crate::execution::optimizer::ParetoOptimizer;
 use crate::hitl::monitor::SemanticMonitor;
 use crate::hitl::triage::Anomaly;
@@ -55,7 +56,7 @@ impl Default for SessionConfig {
 #[derive(Debug)]
 pub struct QueryResult {
     /// The computed record batches.
-    pub batches: Vec<arrow::array::RecordBatch>,
+    pub batches: Vec<RecordBatch>,
     /// If the semantic monitor detected anomalies, they are collected here.
     pub anomalies: Vec<Anomaly>,
     /// Serialized reasoning tree (provenance trace).
@@ -92,6 +93,7 @@ pub struct Session {
     /// AI-Tables model registry.
     pub(crate) model_registry: Arc<ModelRegistry>,
     /// NL-to-Datalog compiler.
+    #[allow(dead_code)]
     pub(crate) nl_compiler: Arc<NlCompiler>,
     /// Pareto multi-objective optimizer.
     pub(crate) optimizer: Arc<ParetoOptimizer>,
@@ -102,7 +104,7 @@ pub struct Session {
     /// Lance table manager.
     pub(crate) lance_mgr: Arc<LanceTableManager>,
     /// Session-level config.
-    pub(crate) config: SessionConfig,
+    pub config: SessionConfig,
 }
 
 impl Session {
@@ -130,41 +132,29 @@ impl Session {
             "initializing AnamDB session"
         );
 
-        // DataFusion context with default settings.
-        let df_config = SessionConfig::default();
-        let _ = &df_config; // consumed below
         let df_ctx = SessionContext::new();
 
-        // Logic engine (Scallop).
         let logic_engine = Arc::new(RwLock::new(LogicEngine::new(config.provenance_mode)?));
-
-        // Model registry.
         let model_registry = Arc::new(ModelRegistry::new());
 
-        // NL compiler.
         let nl_compiler = Arc::new(NlCompiler::new(
             config.llm_api_key.clone(),
             config.llm_endpoint.clone(),
             config.llm_model.clone(),
         ));
 
-        // Device pool.
         let device_pool = Arc::new(if config.enable_hardware_accel {
             DevicePool::detect_hardware().await?
         } else {
             DevicePool::cpu_only()
         });
 
-        // Pareto optimizer.
         let optimizer = Arc::new(ParetoOptimizer::new(
             Arc::clone(&model_registry),
             Arc::clone(&device_pool),
         ));
 
-        // Semantic monitor.
         let monitor = Arc::new(SemanticMonitor::new(config.anomaly_threshold));
-
-        // Lance table manager.
         let lance_mgr = Arc::new(LanceTableManager::new());
 
         Ok(Self {
@@ -189,16 +179,13 @@ impl Session {
         let provider = self.lance_mgr.open_table(path).await?;
         self.df_ctx
             .register_table(name, provider)
-            .map_err(|e| AnamError::DataFusion(e))?;
+            .map_err(AnamError::DataFusion)?;
         Ok(())
     }
 
     // ── Logic operations ───────────────────────────────────────────────
 
     /// Define a logical constraint from natural language.
-    ///
-    /// The NL description is compiled to Datalog via the configured LLM,
-    /// validated, and registered in the logic engine.
     #[instrument(skip(self))]
     pub async fn register_logic_from_nl(
         &self,
@@ -209,7 +196,9 @@ impl Session {
         info!(rule = name, table, "compiling NL → Datalog");
         let datalog_source = self.nl_compiler.compile(nl_description, table).await?;
         info!(datalog = %datalog_source, "generated Datalog");
-        self.logic_engine.write().register_rule(name, &datalog_source)?;
+        self.logic_engine
+            .write()
+            .register_rule(name, &datalog_source)?;
         Ok(())
     }
 
@@ -221,34 +210,25 @@ impl Session {
     // ── Query execution ────────────────────────────────────────────────
 
     /// Execute a neurosymbolic SQL query.
-    ///
-    /// Supports the `WITH (max_latency_ms = X, min_accuracy = Y)` clause for
-    /// multi-objective optimization.
     #[instrument(skip(self))]
     pub async fn sql(&self, query: &str) -> Result<QueryResult> {
         info!(query, "executing neurosymbolic query");
 
-        // Parse multi-objective constraints if present.
         let (clean_sql, constraints) = self.optimizer.parse_constraints(query)?;
 
-        // Plan through DataFusion.
         let df = self
             .df_ctx
             .sql(&clean_sql)
             .await
             .map_err(AnamError::DataFusion)?;
 
-        // If we have constraints, run through Pareto optimization.
         let batches = if let Some(c) = constraints {
             self.optimizer.execute_with_constraints(df, c).await?
         } else {
             df.collect().await.map_err(AnamError::DataFusion)?
         };
 
-        // Semantic monitoring pass.
         let anomalies = self.monitor.inspect_batches(&batches)?;
-
-        // Build reasoning tree from provenance columns.
         let reasoning_tree = self.build_reasoning_tree(&batches)?;
 
         Ok(QueryResult {
@@ -263,23 +243,16 @@ impl Session {
     pub async fn refine_query(&self, correction: &str) -> Result<QueryResult> {
         info!(correction, "refining query with human feedback");
 
-        // Compile the correction into a Datalog patch.
         let patch = self
             .nl_compiler
             .compile(correction, "__refinement__")
             .await?;
 
-        // Apply the patch to the logic engine.
         self.logic_engine
             .write()
             .register_rule("__refinement_patch__", &patch)?;
 
-        // Re-execute the last query context (simplified: re-run the patched logic).
-        let batches = self
-            .logic_engine
-            .read()
-            .evaluate_all()?;
-
+        let batches = self.logic_engine.read().evaluate_all()?;
         let anomalies = self.monitor.inspect_batches(&batches)?;
         let reasoning_tree = self.build_reasoning_tree(&batches)?;
 
@@ -301,7 +274,7 @@ impl Session {
 
     fn build_reasoning_tree(
         &self,
-        batches: &[arrow::array::RecordBatch],
+        batches: &[RecordBatch],
     ) -> Result<Option<String>> {
         if self.config.provenance_mode == ProvenanceMode::Boolean {
             return Ok(None);
@@ -312,16 +285,24 @@ impl Session {
             if let Some(col_idx) = batch.schema().column_with_name("provenance") {
                 tree.push_str(&format!("── Batch {i} ({} rows) ──\n", batch.num_rows()));
                 let col = batch.column(col_idx.0);
-                if let Some(binary_arr) = col.as_any().downcast_ref::<arrow::array::BinaryArray>() {
+                if let Some(binary_arr) = col.as_any().downcast_ref::<BinaryArray>() {
                     for row in 0..binary_arr.len() {
-                        if binary_arr.is_valid(row) {
+                        let nulls = binary_arr.nulls();
+                        let valid = nulls.map_or(true, |n| n.is_valid(row));
+                        if valid {
                             let bytes = binary_arr.value(row);
-                            match crate::core::provenance::PolynomialSemiring::from_bytes(bytes) {
+                            match PolynomialSemiring::from_bytes(bytes) {
                                 Ok(poly) => {
-                                    tree.push_str(&format!("  row {row}: {}\n", poly.explain()));
+                                    tree.push_str(&format!(
+                                        "  row {row}: {}\n",
+                                        poly.explain()
+                                    ));
                                 }
                                 Err(_) => {
-                                    tree.push_str(&format!("  row {row}: <raw {} bytes>\n", bytes.len()));
+                                    tree.push_str(&format!(
+                                        "  row {row}: <raw {} bytes>\n",
+                                        bytes.len()
+                                    ));
                                 }
                             }
                         }

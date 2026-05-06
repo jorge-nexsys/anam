@@ -33,11 +33,6 @@ pub trait FaoOperator: Send + Sync + std::fmt::Debug {
     fn output_schema(&self) -> &Arc<Schema>;
 
     /// Run inference on a batch and return the augmented output batch.
-    ///
-    /// The implementation is responsible for:
-    /// 1. Projecting relevant columns from the input.
-    /// 2. Running inference (ONNX / Burn / custom).
-    /// 3. Attaching confidence and provenance columns.
     async fn execute(&self, input: RecordBatch) -> Result<RecordBatch>;
 
     /// Estimated latency for a batch of the given size (milliseconds).

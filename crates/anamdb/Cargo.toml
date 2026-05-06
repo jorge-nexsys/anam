@@ -28,6 +28,8 @@ datafusion-execution.workspace = true
 lance.workspace = true
 object_store.workspace = true
 url.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
 
 # Inference
 ort.workspace = true

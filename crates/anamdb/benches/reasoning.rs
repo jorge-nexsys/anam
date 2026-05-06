@@ -1,22 +1,20 @@
 //! Benchmark: Reasoning Latency, Proof Trace Overhead, and Throughput.
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
 use datafusion::arrow::array::{Float64Array, RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
 use anamdb::core::provenance::{
-    BoolSemiring, PolynomialSemiring, ProbSemiring, ProvenanceToken, Semiring,
+    BoolSemiring, PolynomialSemiring, ProbSemiring, ProvenanceMode, ProvenanceToken, Semiring,
 };
 use anamdb::logic::engine::LogicEngine;
-use anamdb::core::provenance::ProvenanceMode;
 
 /// Benchmark semiring operations.
 fn bench_semiring(c: &mut Criterion) {
     let mut group = c.benchmark_group("semiring");
 
-    // Boolean semiring.
     group.bench_function("bool_add_1000", |b| {
         b.iter(|| {
             let mut acc = BoolSemiring::zero();
@@ -27,7 +25,6 @@ fn bench_semiring(c: &mut Criterion) {
         });
     });
 
-    // Probability semiring.
     group.bench_function("prob_add_1000", |b| {
         b.iter(|| {
             let mut acc = ProbSemiring::zero();
@@ -38,7 +35,6 @@ fn bench_semiring(c: &mut Criterion) {
         });
     });
 
-    // Polynomial semiring.
     group.bench_function("poly_add_1000", |b| {
         b.iter(|| {
             let mut acc = PolynomialSemiring::zero();
@@ -54,7 +50,6 @@ fn bench_semiring(c: &mut Criterion) {
         });
     });
 
-    // Polynomial serialization round-trip.
     group.bench_function("poly_serde_roundtrip", |b| {
         let token = ProvenanceToken {
             model_ver_id: "model_v1".into(),
@@ -81,7 +76,6 @@ fn bench_logic_engine(c: &mut Criterion) {
             BenchmarkId::new("evaluate_filter", num_rows),
             &num_rows,
             |b, &n| {
-                // Build a test batch.
                 let schema = Arc::new(Schema::new(vec![
                     Field::new("fraud_prob", DataType::Float64, false),
                     Field::new("amount", DataType::Float64, false),
@@ -113,9 +107,7 @@ fn bench_logic_engine(c: &mut Criterion) {
                     .unwrap();
                 engine.add_facts("fraud_prob", vec![batch]).unwrap();
 
-                b.iter(|| {
-                    engine.evaluate("high_risk").unwrap()
-                });
+                b.iter(|| engine.evaluate("high_risk").unwrap());
             },
         );
     }

@@ -4,10 +4,8 @@
 //! semantic anomalies — results that are syntactically valid but logically
 //! unexpected or contradictory.
 
-use std::sync::Arc;
-
-use datafusion::arrow::array::{Float64Array, RecordBatch};
-use tracing::{debug, info, warn};
+use datafusion::arrow::array::{Array, Float64Array, RecordBatch};
+use tracing::{debug, warn};
 
 use crate::core::error::Result;
 use crate::hitl::triage::Anomaly;
@@ -37,6 +35,7 @@ pub enum AnomalyHeuristic {
 #[derive(Debug)]
 pub struct SemanticMonitor {
     /// Global anomaly threshold (0.0–1.0).
+    #[allow(dead_code)]
     threshold: f64,
     /// Registered heuristics.
     heuristics: Vec<AnomalyHeuristic>,
@@ -65,7 +64,6 @@ impl SemanticMonitor {
     pub fn inspect_batches(&self, batches: &[RecordBatch]) -> Result<Vec<Anomaly>> {
         let mut anomalies = Vec::new();
 
-        // Check for empty result set.
         let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         if total_rows == 0 {
             anomalies.push(Anomaly {
@@ -80,7 +78,6 @@ impl SemanticMonitor {
         }
 
         for batch in batches {
-            // Run each heuristic against the batch.
             for heuristic in &self.heuristics {
                 if let Some(anomaly) = self.run_heuristic(heuristic, batch) {
                     anomalies.push(anomaly);
@@ -112,8 +109,12 @@ impl SemanticMonitor {
                         if num_rows == 0 {
                             return None;
                         }
+                        let nulls = arr.nulls();
                         let low_count = (0..num_rows)
-                            .filter(|&i| arr.is_valid(i) && arr.value(i) < *confidence_threshold)
+                            .filter(|&i| {
+                                let valid = nulls.map_or(true, |n| n.is_valid(i));
+                                valid && arr.value(i) < *confidence_threshold
+                            })
                             .count();
                         let low_pct = low_count as f64 / num_rows as f64;
 
@@ -121,15 +122,14 @@ impl SemanticMonitor {
                             return Some(Anomaly {
                                 description: format!(
                                     "{:.0}% of rows have {confidence_column} below {confidence_threshold} \
-                                     (threshold: {:.0}% max). Neural perception may be unreliable for this data.",
+                                     (threshold: {:.0}% max).",
                                     low_pct * 100.0,
                                     max_low_pct * 100.0
                                 ),
                                 affected_rows: low_count,
                                 severity: crate::hitl::triage::AnomalySeverity::Warning,
                                 suggested_action: format!(
-                                    "Consider using a higher-accuracy model or adding domain-specific \
-                                     training data. Current low-confidence rate: {:.1}%.",
+                                    "Consider using a higher-accuracy model. Current low-confidence rate: {:.1}%.",
                                     low_pct * 100.0
                                 ),
                             });
@@ -139,10 +139,7 @@ impl SemanticMonitor {
                 None
             }
 
-            AnomalyHeuristic::EmptyResultSet => {
-                // Already handled at the batch-set level.
-                None
-            }
+            AnomalyHeuristic::EmptyResultSet => None,
 
             AnomalyHeuristic::UniformScores { score_column } => {
                 if let Some((col_idx, _)) = batch.schema().column_with_name(score_column) {
@@ -153,16 +150,17 @@ impl SemanticMonitor {
                             return None;
                         }
 
-                        // Check if all values are identical.
                         let first = arr.value(0);
-                        let all_same = (1..num_rows)
-                            .all(|i| !arr.is_valid(i) || (arr.value(i) - first).abs() < f64::EPSILON);
+                        let nulls = arr.nulls();
+                        let all_same = (1..num_rows).all(|i| {
+                            let valid = nulls.map_or(true, |n| n.is_valid(i));
+                            !valid || (arr.value(i) - first).abs() < f64::EPSILON
+                        });
 
                         if all_same {
                             return Some(Anomaly {
                                 description: format!(
-                                    "All {num_rows} rows in '{score_column}' have identical scores ({first:.4}). \
-                                     This is suspicious — the model may not be discriminating."
+                                    "All {num_rows} rows in '{score_column}' have identical scores ({first:.4})."
                                 ),
                                 affected_rows: num_rows,
                                 severity: crate::hitl::triage::AnomalySeverity::Critical,

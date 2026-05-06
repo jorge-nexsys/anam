@@ -3,13 +3,12 @@
 //! Wraps `ort` to implement [`FaoOperator`] for ONNX models, with support for
 //! CUDA and CoreML execution providers.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use datafusion::arrow::array::{ArrayRef, Float32Array, Float64Array, RecordBatch, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::array::{Array, ArrayRef, Float32Array, Float64Array, RecordBatch};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use async_trait::async_trait;
-use ort::{session::Session as OrtSession, value::Value as OrtValue};
+use ort::session::Session as OrtSession;
 use tracing::{debug, instrument};
 
 use crate::core::error::{AnamError, Result};
@@ -46,10 +45,7 @@ impl OnnxFaoOperator {
             .commit_from_file(model_path.as_ref())
             .map_err(|e| AnamError::Inference(format!("failed to load ONNX model: {e}")))?;
 
-        debug!("loaded ONNX model with {} inputs, {} outputs",
-            session.inputs.len(),
-            session.outputs.len()
-        );
+        debug!("loaded ONNX model");
 
         Ok(Self {
             function_id: function_id.into(),
@@ -87,18 +83,11 @@ impl FaoOperator for OnnxFaoOperator {
     }
 
     async fn execute(&self, input: RecordBatch) -> Result<RecordBatch> {
-        // For the MVP, we assume a simple float32 tensor input.
-        // Production would handle arbitrary schemas via the input_schema mapping.
         let num_rows = input.num_rows();
 
         // Collect numeric columns into a flat f32 tensor.
         let mut flat_data: Vec<f32> = Vec::new();
-        let num_features = input
-            .schema()
-            .fields()
-            .iter()
-            .filter(|f| matches!(f.data_type(), DataType::Float32 | DataType::Float64))
-            .count();
+        let mut num_features = 0usize;
 
         for col_idx in 0..input.num_columns() {
             let col = input.column(col_idx);
@@ -106,11 +95,13 @@ impl FaoOperator for OnnxFaoOperator {
                 DataType::Float32 => {
                     if let Some(arr) = col.as_any().downcast_ref::<Float32Array>() {
                         flat_data.extend(arr.values().iter());
+                        num_features += 1;
                     }
                 }
                 DataType::Float64 => {
                     if let Some(arr) = col.as_any().downcast_ref::<Float64Array>() {
-                        flat_data.extend(arr.values().iter().map(|&v| v as f32));
+                        flat_data.extend(arr.values().iter().map(|v| *v as f32));
+                        num_features += 1;
                     }
                 }
                 _ => continue,
@@ -123,23 +114,27 @@ impl FaoOperator for OnnxFaoOperator {
             ));
         }
 
-        // Create ONNX tensor [num_rows, num_features].
-        let shape = vec![num_rows as i64, num_features as i64];
-        let input_tensor = OrtValue::from_array((shape.iter().map(|&s| s as usize).collect::<Vec<_>>(), flat_data.as_slice()))
+        // Create ONNX tensor [num_rows, num_features] using (shape, Vec<T>).
+        let shape = vec![num_rows, num_features];
+        let input_tensor = ort::value::Tensor::from_array((shape, flat_data))
             .map_err(|e| AnamError::Inference(format!("tensor creation failed: {e}")))?;
 
         // Run inference.
         let outputs = self
             .session
-            .run(ort::inputs![input_tensor].map_err(|e| AnamError::Inference(e.to_string()))?)
+            .run(ort::inputs![input_tensor])
             .map_err(|e| AnamError::Inference(format!("inference failed: {e}")))?;
 
-        // Extract output (assume single output, shape [num_rows] or [num_rows, 1]).
-        let output_values: Vec<f64> = if let Some(output) = outputs.values().next() {
+        // Extract output (assume single output).
+        let output_values: Vec<f64> = if let Some((_name, output)) = outputs.iter().next() {
             let tensor = output
                 .try_extract_tensor::<f32>()
                 .map_err(|e| AnamError::Inference(format!("output extraction failed: {e}")))?;
-            tensor.view().iter().map(|&v| v as f64).collect()
+            tensor.as_slice()
+                .ok_or_else(|| AnamError::Inference("could not get tensor slice".into()))?
+                .iter()
+                .map(|v| *v as f64)
+                .collect()
         } else {
             return Err(AnamError::Inference("model produced no outputs".into()));
         };
@@ -150,13 +145,12 @@ impl FaoOperator for OnnxFaoOperator {
             self.output_schema.clone(),
             vec![score_array],
         )
-        .map_err(|e| AnamError::Arrow(e))?;
+        .map_err(AnamError::Arrow)?;
 
         Ok(output_batch)
     }
 
     fn estimated_latency_ms(&self, batch_size: usize) -> f64 {
-        // Linear scaling estimate from per-row average.
         self.avg_latency_ms * (batch_size as f64 / 1000.0).max(1.0)
     }
 

@@ -5,9 +5,7 @@
 
 use std::any::Any;
 use std::fmt;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -18,8 +16,7 @@ use datafusion_physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion_physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
 };
-use futures::stream::{self, StreamExt};
-use futures::Stream;
+use futures::StreamExt;
 use tracing::debug;
 
 use crate::model::fao::FaoOperator;
@@ -54,18 +51,14 @@ impl NeuralScanExec {
 }
 
 impl DisplayAs for NeuralScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "NeuralScanExec: fao={}@{}, model={}",
-                    self.operator.function_id(),
-                    self.operator.version(),
-                    self.operator.model_id()
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NeuralScanExec: fao={}@{}, model={}",
+            self.operator.function_id(),
+            self.operator.version(),
+            self.operator.model_id()
+        )
     }
 }
 

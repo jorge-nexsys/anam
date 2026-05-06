@@ -222,9 +222,9 @@ impl ParetoOptimizer {
     pub fn compute_pareto_frontier(&self, candidates: &[CandidatePlan]) -> Vec<CandidatePlan> {
         let mut frontier = Vec::new();
 
-        for candidate in candidates {
-            let dominated = candidates.iter().any(|other| {
-                std::ptr::ne(candidate, other) && other.dominates(candidate)
+        for (i, candidate) in candidates.iter().enumerate() {
+            let dominated = candidates.iter().enumerate().any(|(j, other)| {
+                i != j && other.dominates(candidate)
             });
             if !dominated {
                 frontier.push(candidate.clone());
