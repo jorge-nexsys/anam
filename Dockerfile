@@ -1,0 +1,36 @@
+# ─── AnamDB Docker Image ───────────────────────────────────────────────
+# Multi-stage build: compile in Rust builder, run in minimal runtime.
+#
+# Build:  docker build -t anamdb .
+# Run:    docker run -p 8080:8080 anamdb
+# GPU:    docker run --gpus all -p 8080:8080 anamdb --gpu
+
+# ── Stage 1: Builder ──────────────────────────────────────────────────
+FROM rust:1.82-bookworm AS builder
+
+WORKDIR /build
+COPY . .
+
+# Build release binary.
+RUN cargo build --release --bin anam
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /build/target/release/anam /usr/local/bin/anam
+
+# Create default data directory.
+RUN mkdir -p /data/anamdb && \
+    anam init /data/anamdb
+
+WORKDIR /data/anamdb
+
+# Default: start the server on port 8080.
+EXPOSE 8080
+ENTRYPOINT ["anam"]
+CMD ["serve", "--port", "0.0.0.0:8080"]

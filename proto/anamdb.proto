@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package anamdb.v1;
+
+// ─── Service ─────────────────────────────────────────────────────────
+
+/// The AnamDB neurosymbolic query service.
+service AnamService {
+  /// Submit a SQL query and receive streaming result batches.
+  rpc Query (QueryRequest) returns (stream QueryResponse);
+
+  /// Register a Lance table for querying.
+  rpc RegisterTable (RegisterTableRequest) returns (RegisterTableResponse);
+
+  /// Register a Datalog rule as a query filter.
+  rpc RegisterRule (RegisterRuleRequest) returns (RegisterRuleResponse);
+
+  /// Load an ONNX model as a SQL-callable function.
+  rpc LoadModel (LoadModelRequest) returns (LoadModelResponse);
+
+  /// Health check.
+  rpc Health (HealthRequest) returns (HealthResponse);
+}
+
+// ─── Query ───────────────────────────────────────────────────────────
+
+message QueryRequest {
+  /// SQL query string.
+  string sql = 1;
+}
+
+message QueryResponse {
+  /// Arrow IPC-encoded RecordBatch (one per stream message).
+  bytes arrow_ipc_batch = 1;
+
+  /// Schema (sent in the first response only).
+  bytes arrow_ipc_schema = 2;
+
+  /// Provenance reasoning tree (sent in the last response only).
+  string reasoning_tree = 3;
+
+  /// Anomaly descriptions (sent in the last response only).
+  repeated string anomalies = 4;
+}
+
+// ─── Table Registration ─────────────────────────────────────────────
+
+message RegisterTableRequest {
+  /// Logical table name.
+  string name = 1;
+  /// Filesystem path to Lance dataset.
+  string lance_path = 2;
+}
+
+message RegisterTableResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ─── Rule Registration ──────────────────────────────────────────────
+
+message RegisterRuleRequest {
+  /// Rule name.
+  string name = 1;
+  /// Datalog expression.
+  string datalog = 2;
+}
+
+message RegisterRuleResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ─── Model Loading ──────────────────────────────────────────────────
+
+message LoadModelRequest {
+  /// Model name (becomes the SQL function name).
+  string name = 1;
+  /// Model version string.
+  string version = 2;
+  /// Path to the ONNX model file.
+  string model_path = 3;
+  /// SQL function ID.
+  string function_id = 4;
+  /// Number of input features.
+  uint32 num_features = 5;
+  /// Average latency in milliseconds.
+  double avg_latency_ms = 6;
+  /// Model accuracy.
+  double accuracy = 7;
+}
+
+message LoadModelResponse {
+  bool success = 1;
+  /// Unique model ID assigned by the registry.
+  string model_id = 2;
+  string message = 3;
+}
+
+// ─── Health ─────────────────────────────────────────────────────────
+
+message HealthRequest {}
+
+message HealthResponse {
+  /// "SERVING" or "NOT_SERVING".
+  string status = 1;
+  /// AnamDB version.
+  string version = 2;
+  /// Number of registered tables.
+  uint32 table_count = 3;
+  /// Number of registered models.
+  uint32 model_count = 4;
+  /// Number of registered rules.
+  uint32 rule_count = 5;
+}

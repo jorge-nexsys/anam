@@ -7,12 +7,15 @@
 use std::sync::Arc;
 
 use datafusion::arrow::array::{Array, BinaryArray, RecordBatch};
+use datafusion::logical_expr::ScalarUDF;
 use datafusion::prelude::*;
 use parking_lot::RwLock;
 use tracing::{info, instrument};
 
+use crate::execution::fao_udf::FaoScalarUdf;
+
 use crate::core::error::{AnamError, Result};
-use crate::core::provenance::{PolynomialSemiring, ProvenanceMode, Semiring};
+use crate::core::provenance::{PolynomialSemiring, ProvenanceMode, ProvenanceToken, Semiring};
 use crate::execution::dispatcher::DevicePool;
 use crate::execution::optimizer::ParetoOptimizer;
 use crate::hitl::monitor::SemanticMonitor;
@@ -101,7 +104,8 @@ pub struct Session {
     pub(crate) device_pool: Arc<DevicePool>,
     /// Semantic anomaly monitor.
     pub(crate) monitor: Arc<SemanticMonitor>,
-    /// Lance table manager.
+    /// Lance table manager (legacy — kept for backward compatibility).
+    #[allow(dead_code)]
     pub(crate) lance_mgr: Arc<LanceTableManager>,
     /// Session-level config.
     pub config: SessionConfig,
@@ -173,14 +177,46 @@ impl Session {
     // ── Table operations ───────────────────────────────────────────────
 
     /// Register an existing Lance dataset as a queryable table.
+    ///
+    /// Uses the streaming Lance provider for push-down projection and
+    /// filter support (no eager memory loading).
     #[instrument(skip(self))]
     pub async fn register_table(&self, name: &str, path: &str) -> Result<()> {
-        info!(table = name, path, "registering Lance table");
-        let provider = self.lance_mgr.open_table(path).await?;
+        info!(table = name, path, "registering Lance table (streaming)");
+        let provider = crate::storage::streaming_provider::LanceStreamingProvider::open(path).await?;
         self.df_ctx
-            .register_table(name, provider)
+            .register_table(name, Arc::new(provider))
             .map_err(AnamError::DataFusion)?;
         Ok(())
+    }
+
+    // ── Write path ──────────────────────────────────────────────────────
+
+    /// Insert rows into a registered Lance table.
+    ///
+    /// Appends the given batches to the underlying Lance dataset.
+    #[instrument(skip(self, batches))]
+    pub async fn insert(
+        &self,
+        _table_name: &str,
+        lance_path: &str,
+        batches: Vec<RecordBatch>,
+        schema: Arc<datafusion::arrow::datatypes::Schema>,
+    ) -> Result<crate::storage::write_path::WriteResult> {
+        info!(table = _table_name, "INSERT into table");
+        crate::storage::write_path::insert_rows(lance_path, batches, schema).await
+    }
+
+    /// Delete rows from a registered Lance table matching a predicate.
+    #[instrument(skip(self))]
+    pub async fn delete(
+        &self,
+        _table_name: &str,
+        lance_path: &str,
+        predicate: &str,
+    ) -> Result<crate::storage::write_path::WriteResult> {
+        info!(table = _table_name, predicate, "DELETE from table");
+        crate::storage::write_path::delete_rows(lance_path, predicate).await
     }
 
     // ── Logic operations ───────────────────────────────────────────────
@@ -227,6 +263,13 @@ impl Session {
         } else {
             df.collect().await.map_err(AnamError::DataFusion)?
         };
+
+        // Apply registered Datalog rules as post-filters.
+        // Rules whose columns don't match the result schema are skipped.
+        let batches = self.logic_engine.read().filter_batches(&batches)?;
+
+        // Attach provenance column to every output batch.
+        let batches = self.attach_provenance(&batches)?;
 
         let anomalies = self.monitor.inspect_batches(&batches)?;
         let reasoning_tree = self.build_reasoning_tree(&batches)?;
@@ -335,7 +378,9 @@ impl Session {
             1.0,
             0.95,
         )?;
-        self.model_registry.register_operator(Arc::new(operator))?;
+        let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
+        self.model_registry.register_operator(Arc::clone(&operator))?;
+        self.register_fao_udf(Arc::clone(&operator));
 
         info!(model_id = %model_id, "ONNX model registered");
         Ok(model_id)
@@ -405,7 +450,9 @@ impl Session {
             avg_latency_ms,
             accuracy,
         )?;
-        self.model_registry.register_operator(Arc::new(operator))?;
+        let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
+        self.model_registry.register_operator(Arc::clone(&operator))?;
+        self.register_fao_udf(Arc::clone(&operator));
 
         info!(model_id = %model_id, "ONNX model variant registered");
         Ok(model_id)
@@ -516,6 +563,76 @@ impl Session {
 
     // ── Internal helpers ───────────────────────────────────────────────
 
+    fn register_fao_udf(&self, operator: Arc<dyn crate::model::fao::FaoOperator>) {
+        let udf_impl = FaoScalarUdf::new(operator);
+        let udf = ScalarUDF::from(udf_impl);
+        self.df_ctx.register_udf(udf);
+        info!("registered FAO as DataFusion scalar UDF");
+    }
+
+    /// Attach provenance column to every output batch.
+    ///
+    /// Each row gets a `provenance: Binary` column encoding lineage as a
+    /// Polynomial semiring token, tracking the query pipeline and row index.
+    fn attach_provenance(&self, batches: &[RecordBatch]) -> Result<Vec<RecordBatch>> {
+        use datafusion::arrow::array::{ArrayRef, BinaryArray};
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        if batches.is_empty() {
+            return Ok(batches.to_vec());
+        }
+
+        let mode = self.config.provenance_mode;
+        let mut result = Vec::with_capacity(batches.len());
+
+        for batch in batches {
+            // Skip if provenance column already exists.
+            if batch.schema().column_with_name("provenance").is_some() {
+                result.push(batch.clone());
+                continue;
+            }
+
+            let num_rows = batch.num_rows();
+
+            // Generate provenance bytes for each row.
+            let prov_bytes: Vec<Vec<u8>> = (0..num_rows)
+                .map(|row_idx| match mode {
+                    ProvenanceMode::Boolean => vec![1u8],
+                    ProvenanceMode::Probability => 1.0_f64.to_le_bytes().to_vec(),
+                    ProvenanceMode::Polynomial => {
+                        let token = ProvenanceToken {
+                            model_ver_id: "query_pipeline".to_string(),
+                            func_id: "sql".to_string(),
+                            source_record_ids: vec![format!("row_{row_idx}")],
+                        };
+                        let poly = PolynomialSemiring::singleton(token);
+                        poly.to_bytes().unwrap_or_default()
+                    }
+                })
+                .collect();
+
+            let prov_refs: Vec<&[u8]> = prov_bytes.iter().map(|b| b.as_slice()).collect();
+            let prov_array: ArrayRef = Arc::new(BinaryArray::from(prov_refs));
+
+            // Build new schema with provenance column.
+            let mut fields: Vec<Arc<Field>> = batch.schema().fields().to_vec();
+            fields.push(Arc::new(Field::new("provenance", DataType::Binary, true)));
+            let new_schema = Arc::new(Schema::new(fields));
+
+            // Build new columns.
+            let mut columns: Vec<ArrayRef> = (0..batch.num_columns())
+                .map(|i| batch.column(i).clone())
+                .collect();
+            columns.push(prov_array);
+
+            let new_batch = RecordBatch::try_new(new_schema, columns)
+                .map_err(AnamError::Arrow)?;
+            result.push(new_batch);
+        }
+
+        Ok(result)
+    }
+
     fn build_reasoning_tree(&self, batches: &[RecordBatch]) -> Result<Option<String>> {
         if self.config.provenance_mode == ProvenanceMode::Boolean {
             return Ok(None);
@@ -556,3 +673,4 @@ impl Session {
         }
     }
 }
+

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnamDB Playground — Neural-Symbolic Query Engine</title>
+  <meta name="description" content="Interactive playground for AnamDB, the AI-native differentiable logic kernel for autonomous agents." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ─── Header ──────────────────────────────────────────────────── -->
+  <header id="app-header">
+    <div class="header-left">
+      <div class="logo-mark">◈</div>
+      <h1>AnamDB<span class="version">v0.1.0-α</span></h1>
+    </div>
+    <div class="header-center">
+      <div class="connection-status" id="connection-status">
+        <span class="status-dot"></span>
+        <span class="status-text">Disconnected</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="btn-icon" id="btn-theme" title="Toggle theme">◐</button>
+      <button class="btn-icon" id="btn-settings" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- ─── Main Layout ─────────────────────────────────────────────── -->
+  <main id="app-main">
+    <!-- Left Panel: SQL Editor + Controls -->
+    <section class="panel panel-editor" id="panel-editor">
+      <div class="panel-header">
+        <span class="panel-title">SQL Editor</span>
+        <div class="panel-actions">
+          <select id="query-presets" class="select-preset">
+            <option value="">— Presets —</option>
+            <option value="basic">Basic SELECT</option>
+            <option value="filter">Filtered Query</option>
+            <option value="udf">Neural UDF (fraud_detector)</option>
+            <option value="aggregate">Aggregation</option>
+            <option value="provenance">With Provenance</option>
+          </select>
+        </div>
+      </div>
+      <div class="editor-wrapper">
+        <textarea id="sql-editor" spellcheck="false" placeholder="SELECT * FROM txns WHERE fraud_prob > 0.8 LIMIT 10">SELECT amount, fraud_prob, region
+FROM txns
+WHERE fraud_prob > 0.80
+ORDER BY amount DESC
+LIMIT 10</textarea>
+      </div>
+      <div class="editor-toolbar">
+        <button class="btn btn-primary" id="btn-execute" title="Execute (⌘+Enter)">
+          <span class="btn-icon-inline">▶</span> Execute
+        </button>
+        <button class="btn btn-secondary" id="btn-explain" title="Explain query">
+          <span class="btn-icon-inline">🔍</span> Explain
+        </button>
+        <span class="toolbar-info" id="query-time"></span>
+      </div>
+
+      <!-- ─── Registered Items ───────────────────────────────── -->
+      <div class="registry-section">
+        <div class="registry-group">
+          <h3>📊 Tables</h3>
+          <div id="registered-tables" class="registry-list">
+            <div class="registry-item">txns <span class="badge">25 rows</span></div>
+          </div>
+        </div>
+        <div class="registry-group">
+          <h3>🧠 Models</h3>
+          <div id="registered-models" class="registry-list">
+            <div class="registry-item">fraud_detector <span class="badge">ONNX</span></div>
+          </div>
+        </div>
+        <div class="registry-group">
+          <h3>📐 Rules</h3>
+          <div id="registered-rules" class="registry-list">
+            <div class="registry-item">high_risk <span class="badge badge-warn">active</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Center Panel: Results Grid + Tabs -->
+    <section class="panel panel-results" id="panel-results">
+      <div class="panel-header">
+        <div class="tab-bar" id="result-tabs">
+          <button class="tab active" data-tab="grid">Results</button>
+          <button class="tab" data-tab="provenance">Provenance</button>
+          <button class="tab" data-tab="pareto">Pareto Frontier</button>
+          <button class="tab" data-tab="triage">HITL Triage</button>
+        </div>
+        <span class="result-count" id="result-count"></span>
+      </div>
+
+      <!-- Results Grid -->
+      <div class="tab-content active" id="tab-grid">
+        <div class="results-grid" id="results-grid">
+          <div class="empty-state">
+            <div class="empty-icon">◇</div>
+            <p>Execute a query to see results</p>
+            <span class="empty-hint">⌘+Enter to run</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Provenance Tree -->
+      <div class="tab-content" id="tab-provenance">
+        <div class="provenance-viewer" id="provenance-viewer">
+          <div class="empty-state">
+            <div class="empty-icon">🌳</div>
+            <p>Click a result row to view its derivation tree</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pareto Frontier -->
+      <div class="tab-content" id="tab-pareto">
+        <div class="pareto-container" id="pareto-container">
+          <canvas id="pareto-chart" width="800" height="400"></canvas>
+          <div class="pareto-legend" id="pareto-legend"></div>
+        </div>
+      </div>
+
+      <!-- HITL Triage -->
+      <div class="tab-content" id="tab-triage">
+        <div class="triage-panel" id="triage-panel">
+          <div class="empty-state">
+            <div class="empty-icon">⚡</div>
+            <p>No anomalies detected</p>
+            <span class="empty-hint">Anomalies will appear here when the semantic monitor flags results</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Panel: Reasoning Trace -->
+    <section class="panel panel-trace" id="panel-trace">
+      <div class="panel-header">
+        <span class="panel-title">Reasoning Trace</span>
+        <button class="btn-icon btn-sm" id="btn-copy-trace" title="Copy trace">📋</button>
+      </div>
+      <div class="trace-content" id="trace-content">
+        <div class="empty-state">
+          <div class="empty-icon">🔗</div>
+          <p>Provenance trace will appear after query execution</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─── Status Bar ──────────────────────────────────────────────── -->
+  <footer id="status-bar">
+    <div class="status-left">
+      <span class="status-item" id="status-engine">Engine: Polynomial Semiring</span>
+      <span class="status-separator">│</span>
+      <span class="status-item" id="status-device">Device: CPU</span>
+    </div>
+    <div class="status-right">
+      <span class="status-item" id="status-rows">0 rows</span>
+      <span class="status-separator">│</span>
+      <span class="status-item" id="status-latency">—</span>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

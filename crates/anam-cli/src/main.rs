@@ -42,6 +42,26 @@ struct Cli {
     /// Log level (trace, debug, info, warn, error).
     #[arg(long, default_value = "info")]
     log_level: String,
+
+    /// Subcommand (serve, init).
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Command {
+    /// Start the AnamDB server.
+    Serve {
+        /// Address to bind (host:port).
+        #[arg(long, default_value = "0.0.0.0:8080")]
+        port: String,
+    },
+    /// Initialize a new AnamDB data directory.
+    Init {
+        /// Path to the data directory.
+        #[arg(default_value = "./anamdb_data")]
+        path: String,
+    },
 }
 
 #[tokio::main]
@@ -90,6 +110,57 @@ async fn main() -> Result<()> {
         llm_model: Some(cli.llm_model),
         anomaly_threshold: 0.5,
     };
+
+    // Handle subcommands.
+    match cli.command {
+        Some(Command::Serve { port }) => {
+            println!("🚀 Starting AnamDB server on {port}...");
+            anamdb::server::serve(&port, config).await?;
+            return Ok(());
+        }
+        Some(Command::Init { path }) => {
+            println!("📁 Initializing AnamDB data directory: {path}");
+            std::fs::create_dir_all(&path)?;
+            std::fs::create_dir_all(format!("{path}/tables"))?;
+            std::fs::create_dir_all(format!("{path}/models"))?;
+
+            // Create default config file.
+            let config_path = format!("{path}/anamdb.toml");
+            if !std::path::Path::new(&config_path).exists() {
+                std::fs::write(
+                    &config_path,
+                    r#"# AnamDB Configuration
+[server]
+bind = "0.0.0.0:8080"
+log_level = "info"
+
+[engine]
+provenance_mode = "polynomial"
+gpu = false
+anomaly_threshold = 0.5
+
+[catalog]
+path = "catalog.json"
+"#,
+                )?;
+                println!("  ✓ Created {config_path}");
+            }
+
+            // Create empty catalog.
+            let catalog_path = format!("{path}/catalog.json");
+            if !std::path::Path::new(&catalog_path).exists() {
+                let _store =
+                    anamdb::storage::catalog::CatalogStore::open(&catalog_path)?;
+                println!("  ✓ Created {catalog_path}");
+            }
+
+            println!("  ✓ Created {path}/tables/");
+            println!("  ✓ Created {path}/models/");
+            println!("\n  Done! Start the server with: anam serve --port 0.0.0.0:8080");
+            return Ok(());
+        }
+        None => {} // Fall through to REPL.
+    }
 
     let session = Session::with_config(config).await?;
 

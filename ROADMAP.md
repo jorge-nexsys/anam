@@ -39,9 +39,47 @@ This roadmap outlines the path from our current single-node logic kernel to a fu
 
 ---
 
-## Phase 4: Beyond v1.0 — Ecosystem & Customization
+## Phase 4: Engine Integration — Neural-Symbolic Query Fusion
+*Focus: Wiring existing subsystems into a single unified query pipeline where models, logic, and provenance execute inline.*
+
+- [x] **ONNX Models as DataFusion UDFs:** Register FAO operators as scalar UDFs so `SELECT fraud_detector(amount, region, time) FROM txns` runs ONNX inference inline during query execution.
+- [x] **Datalog Rules as Query Filters:** Wire the LogicEngine into DataFusion's physical plan so registered rules act as post-query filters that block results violating symbolic constraints.
+- [x] **Provenance Attachment:** Build a custom `ExecutionPlan` wrapper that appends a `provenance: Binary` column (Polynomial semiring) to every output batch, encoding lineage per-row.
+- [x] **Streaming Lance TableProvider:** Replace the eager `scan_to_memtable` with a proper `TableProvider` that wraps Lance's streaming scanner with push-down projection and filter support.
+- [x] **Write Path (INSERT / UPDATE / DELETE):** Implement SQL mutation support via Lance's append, merge, and delete APIs.
+- [x] **Persistent Catalog:** SQLite-backed catalog that stores registered tables, Datalog rules, model metadata, BCNF policies, and session config across restarts.
+
+---
+
+## Phase 5: Server & SDKs — Production Wire Protocol
+*Focus: `cargo install anamdb` → `anamdb serve` → connect from any application.*
+
+- [x] **gRPC Server (`anam-server`):** Production gRPC server using `tonic` with streaming result delivery, health checks, and reflection.
+- [x] **Wire Protocol:** SQL submission, streaming Arrow IPC result batches, dot-command RPC, session management, and authentication stubs.
+- [x] **Rust Client SDK (`anam-client`):** Native async Rust client with connection pooling, retry logic, and typed query builders.
+- [x] **Python SDK (`pyanamdb`):** PyO3 native bindings wrapping the Rust client for zero-overhead Python integration.
+- [x] **CLI & Packaging:** `cargo install anamdb`, `anamdb init ./data`, `anamdb serve --port 8080 --gpu`, config file (`anamdb.toml`).
+- [x] **Docker Image:** `docker run anamdb` with pre-configured GPU passthrough and volume mounts.
+
+---
+
+## Phase 6: Live Demo — Interactive Playground (Local + Hosted)
+*Focus: A web-based playground backed by a live AnamDB instance, deployable both locally and to cloud.*
+
+- [x] **Web Frontend:** SQL editor (Monaco/CodeMirror) + streaming results grid + reasoning trace panel + dark-mode UI.
+- [x] **WebSocket Bridge:** Real-time streaming from the gRPC backend to the browser via a thin WebSocket relay.
+- [x] **Demo Dataset & Logic Pack:** One-click setup with pre-loaded 100K transactions, ONNX models, and Financial Compliance Logic Pack.
+- [x] **Pareto Visualization:** Interactive scatter plot showing the latency × accuracy × cost frontier with selectable plan highlighting.
+- [x] **Provenance Tree Viewer:** Click any result row → visual derivation tree showing source records, model versions, and confidence at each hop.
+- [x] **HITL Triage UI:** Accept / Correct / RetryWithModel / Abort buttons for interactive anomaly resolution in the browser.
+- [x] **Hosted Deployment:** Cloud-hosted instance (Fly.io / Railway / AWS) with shareable URL for investors and partners.
+
+---
+
+## Phase 7: Ecosystem & Customization
 *Focus: Broadening the ecosystem and lowering the barrier to entry for highly specialized domains.*
 
 - [ ] **Automated Model Distillation:** Allow users to automatically distill large, slow models (e.g., VideoMAEV2) into smaller, faster equivalents directly within the database to shift the Pareto frontier favorably.
 - [ ] **Expanded Semantic Abstractions:** Native support for 3D spatial representations and advanced temporal audio graphs within the unified relational layer.
-- [ ] **Community AI-Tables Hub:** A centralized package manager for developers to share pre-trained FAO models and Datalog constraints. 
+- [ ] **Community AI-Tables Hub:** A centralized package manager for developers to share pre-trained FAO models and Datalog constraints.
+

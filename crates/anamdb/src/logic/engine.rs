@@ -123,6 +123,60 @@ impl LogicEngine {
         Ok(all_results)
     }
 
+    /// Apply all registered rules as post-filters against the given batches.
+    ///
+    /// For each rule, rows that **violate** the rule's conditions are removed.
+    /// Rules whose columns don't match the batch schema are silently skipped
+    /// (they apply to different tables).
+    ///
+    /// This is the integration point for wiring Datalog constraints into
+    /// DataFusion's query pipeline.
+    pub fn filter_batches(&self, batches: &[RecordBatch]) -> Result<Vec<RecordBatch>> {
+        if self.rules.is_empty() || batches.is_empty() {
+            return Ok(batches.to_vec());
+        }
+
+        let mut filtered = batches.to_vec();
+
+        for rule in self.rules.values() {
+            let (_output_rel, _input_rels, conditions) =
+                self.parse_rule_structure(&rule.datalog_source)?;
+
+            if conditions.is_empty() {
+                continue;
+            }
+
+            // Check if any condition column matches the batch schema.
+            // If none match, this rule applies to a different table — skip it.
+            if let Some(first_batch) = filtered.first() {
+                let schema = first_batch.schema();
+                let any_column_matches = conditions.iter().any(|c| {
+                    let col_name = c.column.split('.').next_back().unwrap_or(&c.column);
+                    schema.column_with_name(col_name).is_some()
+                });
+                if !any_column_matches {
+                    continue;
+                }
+            }
+
+            debug!(
+                rule = %rule.name,
+                conditions = conditions.len(),
+                "applying Datalog rule as post-filter"
+            );
+
+            filtered = filtered
+                .iter()
+                .map(|batch| self.apply_conditions(batch, &conditions))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|b| b.num_rows() > 0)
+                .collect();
+        }
+
+        Ok(filtered)
+    }
+
     fn evaluate_with_scallop(&self, rule: &LogicRule) -> Result<Vec<RecordBatch>> {
         let (_output_rel, input_rels, conditions) =
             self.parse_rule_structure(&rule.datalog_source)?;

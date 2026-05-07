@@ -5,5 +5,6 @@
 //! to instantly configure domain-specific reasoning.
 
 pub mod logic_pack;
+pub mod python;
 
 pub use logic_pack::{LogicPack, LogicPackBuilder};
