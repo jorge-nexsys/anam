@@ -2,7 +2,7 @@
 //! Run with: cargo test --lib bench_quick -- --nocapture
 
 #[cfg(test)]
-mod bench_quick {
+mod tests {
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -170,7 +170,9 @@ mod bench_quick {
             let iterations = 1000;
             let start = Instant::now();
             for _ in 0..iterations {
-                let _ = monitor.inspect_batches(&[batch.clone()]).unwrap();
+                let _ = monitor
+                    .inspect_batches(std::slice::from_ref(&batch))
+                    .unwrap();
             }
             let dt = start.elapsed();
             let per_iter = dt / iterations;

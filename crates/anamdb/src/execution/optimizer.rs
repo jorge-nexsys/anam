@@ -42,20 +42,23 @@ pub struct CandidatePlan {
 impl CandidatePlan {
     /// Check if this plan satisfies the given constraints.
     pub fn satisfies(&self, constraints: &QueryConstraints) -> bool {
-        if let Some(max_lat) = constraints.max_latency_ms {
-            if self.est_latency_ms > max_lat {
-                return false;
-            }
+        if constraints
+            .max_latency_ms
+            .is_some_and(|max_lat| self.est_latency_ms > max_lat)
+        {
+            return false;
         }
-        if let Some(min_acc) = constraints.min_accuracy {
-            if self.est_accuracy < min_acc {
-                return false;
-            }
+        if constraints
+            .min_accuracy
+            .is_some_and(|min_acc| self.est_accuracy < min_acc)
+        {
+            return false;
         }
-        if let Some(max_cost) = constraints.max_cost {
-            if self.est_cost > max_cost {
-                return false;
-            }
+        if constraints
+            .max_cost
+            .is_some_and(|max_cost| self.est_cost > max_cost)
+        {
+            return false;
         }
         true
     }

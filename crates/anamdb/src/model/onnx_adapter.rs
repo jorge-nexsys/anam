@@ -30,6 +30,7 @@ pub struct OnnxFaoOperator {
 
 impl OnnxFaoOperator {
     /// Load an ONNX model from disk and wrap it as an FAO operator.
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all, fields(model_path = %model_path.as_ref().display()))]
     pub fn load(
         model_path: impl AsRef<std::path::Path>,

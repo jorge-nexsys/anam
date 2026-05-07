@@ -4,7 +4,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use datafusion::arrow::array::{Array, ArrayRef, BinaryArray, RecordBatch};
+use datafusion::arrow::array::{ArrayRef, BinaryArray, RecordBatch};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion_common::Result as DfResult;

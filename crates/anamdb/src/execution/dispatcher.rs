@@ -80,7 +80,7 @@ pub struct DevicePool {
     /// Available device slots.
     slots: Vec<DeviceSlot>,
     /// Round-robin counter for load balancing.
-    next_slot: AtomicUsize,
+    _next_slot: AtomicUsize,
     /// Current load per slot (number of active jobs).
     slot_loads: Vec<AtomicUsize>,
 }
@@ -117,7 +117,7 @@ impl DevicePool {
 
         Self {
             slots,
-            next_slot: AtomicUsize::new(0),
+            _next_slot: AtomicUsize::new(0),
             slot_loads,
         }
     }
@@ -204,7 +204,7 @@ impl DevicePool {
 
         Ok(Self {
             slots,
-            next_slot: AtomicUsize::new(0),
+            _next_slot: AtomicUsize::new(0),
             slot_loads,
         })
     }
@@ -492,7 +492,7 @@ mod tests {
             est_cpu_time_ms: 10.0,
             est_memory_bytes: 0,
         };
-        let assignment2 = pool.dispatch(job2).unwrap();
+        let _assignment2 = pool.dispatch(job2).unwrap();
 
         // Complete the first job.
         pool.complete_job(&assignment1);

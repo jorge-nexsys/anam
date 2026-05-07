@@ -345,6 +345,7 @@ impl Session {
     ///
     /// Use this to register multiple model variants with different
     /// latency/accuracy trade-offs for Pareto optimization.
+    #[allow(clippy::too_many_arguments)]
     #[instrument(skip(self))]
     pub fn load_onnx_model_with_metrics(
         &self,
@@ -425,7 +426,7 @@ impl Session {
                 if let Some(binary_arr) = col.as_any().downcast_ref::<BinaryArray>() {
                     for row in 0..binary_arr.len() {
                         let nulls = binary_arr.nulls();
-                        let valid = nulls.map_or(true, |n| n.is_valid(row));
+                        let valid = nulls.is_none_or(|n| n.is_valid(row));
                         if valid {
                             let bytes = binary_arr.value(row);
                             match PolynomialSemiring::from_bytes(bytes) {

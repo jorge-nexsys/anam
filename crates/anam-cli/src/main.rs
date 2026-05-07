@@ -51,11 +51,12 @@ async fn main() -> Result<()> {
 
     // Map OPENAI_API_KEY → ANAM_LLM_API_KEY if the latter isn't already set.
     // SAFETY: called before any threads are spawned.
-    if std::env::var("ANAM_LLM_API_KEY").is_err() {
-        if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-            unsafe {
-                std::env::set_var("ANAM_LLM_API_KEY", &key);
-            }
+    if std::env::var("ANAM_LLM_API_KEY").is_err()
+        && let Ok(key) = std::env::var("OPENAI_API_KEY")
+    {
+        // SAFETY: called before any threads are spawned.
+        unsafe {
+            std::env::set_var("ANAM_LLM_API_KEY", &key);
         }
     }
 
@@ -358,7 +359,7 @@ async fn handle_dot_command(
             if operators.len() >= 2 {
                 println!();
                 println!("─── Pareto Frontier ────────────────────────────────────");
-                use anamdb::execution::optimizer::{CandidatePlan, ParetoOptimizer};
+                use anamdb::execution::optimizer::CandidatePlan;
                 let pool = session.device_pool();
                 let device_mult = pool.speed_multiplier();
                 let candidates: Vec<CandidatePlan> = operators
@@ -400,14 +401,14 @@ async fn handle_dot_command(
             println!("{}", session.device_pool().summary());
 
             // 5. Anomaly status
-            if let Some(result) = last_result {
-                if !result.anomalies.is_empty() {
-                    println!();
-                    println!("─── Anomalies ──────────────────────────────────────────");
-                    for a in &result.anomalies {
-                        println!("  ⚠ [{}] {}", a.severity, a.description);
-                        println!("    → {}", a.suggested_action);
-                    }
+            if let Some(result) = last_result
+                && !result.anomalies.is_empty()
+            {
+                println!();
+                println!("─── Anomalies ──────────────────────────────────────────");
+                for a in &result.anomalies {
+                    println!("  ⚠ [{}] {}", a.severity, a.description);
+                    println!("    → {}", a.suggested_action);
                 }
             }
 
@@ -436,7 +437,7 @@ async fn handle_dot_command(
             } else {
                 let parts: Vec<&str> = arg.splitn(2, ' ').collect();
                 let csv_path = parts[0];
-                let lance_path = parts.get(1).copied().unwrap_or_else(|| csv_path);
+                let lance_path = parts.get(1).copied().unwrap_or(csv_path);
                 let lance_output = if lance_path.ends_with(".lance") {
                     lance_path.to_string()
                 } else {

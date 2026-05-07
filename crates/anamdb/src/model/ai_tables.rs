@@ -30,7 +30,7 @@ impl std::fmt::Display for ModelFormat {
 }
 
 /// Device affinity hint for the heterogeneous dispatcher.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DeviceAffinity {
     /// Runs on any available CPU core.
@@ -40,13 +40,8 @@ pub enum DeviceAffinity {
     /// Prefers Neural Processing Unit.
     Npu,
     /// No preference — dispatcher decides.
+    #[default]
     Any,
-}
-
-impl Default for DeviceAffinity {
-    fn default() -> Self {
-        DeviceAffinity::Any
-    }
 }
 
 /// A single entry in the `__ai_models` system catalog.

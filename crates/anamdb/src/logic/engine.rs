@@ -204,7 +204,7 @@ impl LogicEngine {
             let col_name = condition
                 .column
                 .split('.')
-                .last()
+                .next_back()
                 .unwrap_or(&condition.column);
 
             if let Some((col_idx, _)) = batch.schema().column_with_name(col_name) {
@@ -219,10 +219,10 @@ impl LogicEngine {
                                     condition.value
                                 ))
                             })?;
-                            for i in 0..num_rows {
-                                let is_valid = nulls.map_or(true, |n| n.is_valid(i));
-                                if mask[i] && is_valid {
-                                    mask[i] = match condition.op {
+                            for (i, m) in mask.iter_mut().enumerate().take(num_rows) {
+                                let is_valid = nulls.is_none_or(|n| n.is_valid(i));
+                                if *m && is_valid {
+                                    *m = match condition.op {
                                         FilterOp::Gt => arr.value(i) > threshold,
                                         FilterOp::Lt => arr.value(i) < threshold,
                                         FilterOp::Gte => arr.value(i) >= threshold,
@@ -241,10 +241,10 @@ impl LogicEngine {
                     DataType::Utf8 => {
                         if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
                             let target = condition.value.trim_matches('\'').trim_matches('"');
-                            for i in 0..num_rows {
-                                let is_valid = nulls.map_or(true, |n| n.is_valid(i));
-                                if mask[i] && is_valid {
-                                    mask[i] = match condition.op {
+                            for (i, m) in mask.iter_mut().enumerate().take(num_rows) {
+                                let is_valid = nulls.is_none_or(|n| n.is_valid(i));
+                                if *m && is_valid {
+                                    *m = match condition.op {
                                         FilterOp::Eq => arr.value(i) == target,
                                         FilterOp::Neq => arr.value(i) != target,
                                         _ => true,

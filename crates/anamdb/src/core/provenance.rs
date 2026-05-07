@@ -214,20 +214,15 @@ impl Semiring for PolynomialSemiring {
 // ── Utilities ──────────────────────────────────────────────────────────────
 
 /// Which provenance semiring a session is configured to use.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ProvenanceMode {
     /// Standard boolean (SQL) semantics.
     Boolean,
     /// Probabilistic confidence propagation.
     Probability,
     /// Full polynomial lineage.
+    #[default]
     Polynomial,
-}
-
-impl Default for ProvenanceMode {
-    fn default() -> Self {
-        ProvenanceMode::Polynomial
-    }
 }
 
 #[cfg(test)]

@@ -120,7 +120,7 @@ impl SemanticMonitor {
                         let nulls = arr.nulls();
                         let low_count = (0..num_rows)
                             .filter(|&i| {
-                                let valid = nulls.map_or(true, |n| n.is_valid(i));
+                                let valid = nulls.is_none_or(|n| n.is_valid(i));
                                 valid && arr.value(i) < *confidence_threshold
                             })
                             .count();
@@ -161,7 +161,7 @@ impl SemanticMonitor {
                         let first = arr.value(0);
                         let nulls = arr.nulls();
                         let all_same = (1..num_rows).all(|i| {
-                            let valid = nulls.map_or(true, |n| n.is_valid(i));
+                            let valid = nulls.is_none_or(|n| n.is_valid(i));
                             !valid || (arr.value(i) - first).abs() < f64::EPSILON
                         });
 
