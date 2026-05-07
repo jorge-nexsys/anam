@@ -31,11 +31,11 @@ This roadmap outlines the path from our current single-node logic kernel to a fu
 ## Phase 3: v1.0 — The Distributed Reasoning Plane
 *Focus: Scaling logical inference and neural perception across multi-agent clusters.*
 
-- [ ] **Distributed Lance Storage:** Partition the Arrow-backed Lance storage across the cluster, maintaining zero-copy reads for local edge nodes while enabling distributed similarity searches.
-- [ ] **BCNF Policy Enforcement:** Migrate all Datalog rules, programmatic constraints, and schema definitions into a strict Boyce-Codd Normal Form (BCNF) relational catalog to ensure seamless, anomaly-free policy updates across the cluster.
-- [ ] **Distributed Multi-Objective Optimization:** Upgrade the Neural Cost-Based Optimizer (NCBO) to include network routing costs and data-movement overhead in its Pareto frontier calculations.
-- [ ] **Multi-Agent Task Routing:** Implement FAO routing to dynamically dispatch perception functions (e.g., running an NPU-accelerated OCR model) to edge nodes while reserving high-memory symbolic joins for core nodes.
-- [ ] **Global Lineage & Decentralized Triage:** Serialize the Semiring Provenance across network boundaries and enable cluster-wide Agentic Monitoring that isolates anomalous data paths locally without blocking the rest of the distributed system.
+- [x] **Distributed Lance Storage:** Partition the Arrow-backed Lance storage across the cluster, maintaining zero-copy reads for local edge nodes while enabling distributed similarity searches.
+- [x] **BCNF Policy Enforcement:** Migrate all Datalog rules, programmatic constraints, and schema definitions into a strict Boyce-Codd Normal Form (BCNF) relational catalog to ensure seamless, anomaly-free policy updates across the cluster.
+- [x] **Distributed Multi-Objective Optimization:** Upgrade the Neural Cost-Based Optimizer (NCBO) to include network routing costs and data-movement overhead in its Pareto frontier calculations.
+- [x] **Multi-Agent Task Routing:** Implement FAO routing to dynamically dispatch perception functions (e.g., running an NPU-accelerated OCR model) to edge nodes while reserving high-memory symbolic joins for core nodes.
+- [x] **Global Lineage & Decentralized Triage:** Serialize the Semiring Provenance across network boundaries and enable cluster-wide Agentic Monitoring that isolates anomalous data paths locally without blocking the rest of the distributed system.
 
 ---
 
