@@ -1,12 +1,11 @@
 //! `anam` — interactive CLI / REPL for AnamDB.
 
-
 use anyhow::Result;
-use datafusion::arrow::util::pretty::pretty_format_batches;
 use clap::Parser;
 use comfy_table::{Cell, Table};
-use rustyline::error::ReadlineError;
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 use tracing_subscriber::EnvFilter;
 
 use anamdb::core::provenance::ProvenanceMode;
@@ -54,7 +53,9 @@ async fn main() -> Result<()> {
     // SAFETY: called before any threads are spawned.
     if std::env::var("ANAM_LLM_API_KEY").is_err() {
         if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-            unsafe { std::env::set_var("ANAM_LLM_API_KEY", &key); }
+            unsafe {
+                std::env::set_var("ANAM_LLM_API_KEY", &key);
+            }
         }
     }
 
@@ -63,8 +64,7 @@ async fn main() -> Result<()> {
     // Initialize tracing.
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
         )
         .with_target(false)
         .init();
@@ -234,7 +234,14 @@ async fn handle_dot_command(
                 println!("No models registered.");
             } else {
                 let mut table = Table::new();
-                table.set_header(vec!["ID", "Name", "Version", "Format", "Latency (ms)", "Accuracy"]);
+                table.set_header(vec![
+                    "ID",
+                    "Name",
+                    "Version",
+                    "Format",
+                    "Latency (ms)",
+                    "Accuracy",
+                ]);
                 for m in &models {
                     table.add_row(vec![
                         Cell::new(&m.model_id[..8]),
@@ -270,19 +277,20 @@ async fn handle_dot_command(
         }
 
         ".rules" => {
-            let rules = session.logic_engine().read().list_rules().iter().map(|r| {
-                (r.name.clone(), r.datalog_source.clone())
-            }).collect::<Vec<_>>();
+            let rules = session
+                .logic_engine()
+                .read()
+                .list_rules()
+                .iter()
+                .map(|r| (r.name.clone(), r.datalog_source.clone()))
+                .collect::<Vec<_>>();
             if rules.is_empty() {
                 println!("No Datalog rules registered.");
             } else {
                 let mut table = Table::new();
                 table.set_header(vec!["Name", "Datalog Source"]);
                 for (name, source) in &rules {
-                    table.add_row(vec![
-                        Cell::new(name),
-                        Cell::new(source),
-                    ]);
+                    table.add_row(vec![Cell::new(name), Cell::new(source)]);
                 }
                 println!("{table}");
             }
@@ -304,7 +312,11 @@ async fn handle_dot_command(
             println!("  Mode: {:?}", session.config.provenance_mode);
             if let Some(result) = last_result {
                 let total_rows: usize = result.batches.iter().map(|b| b.num_rows()).sum();
-                println!("  Last query: {} batch(es), {} rows", result.batches.len(), total_rows);
+                println!(
+                    "  Last query: {} batch(es), {} rows",
+                    result.batches.len(),
+                    total_rows
+                );
                 if let Some(tree) = &result.reasoning_tree {
                     println!();
                     println!("{tree}");
@@ -338,9 +350,7 @@ async fn handle_dot_command(
                 for m in &models {
                     println!(
                         "  • {} v{} [{}] — latency: {:.1}ms, accuracy: {:.2}, {}",
-                        m.name, m.version, m.format,
-                        m.avg_latency_ms, m.accuracy,
-                        m.artifact_path
+                        m.name, m.version, m.format, m.avg_latency_ms, m.accuracy, m.artifact_path
                     );
                 }
             }
@@ -348,28 +358,38 @@ async fn handle_dot_command(
             if operators.len() >= 2 {
                 println!();
                 println!("─── Pareto Frontier ────────────────────────────────────");
-                use anamdb::execution::optimizer::{ParetoOptimizer, CandidatePlan};
+                use anamdb::execution::optimizer::{CandidatePlan, ParetoOptimizer};
                 let pool = session.device_pool();
                 let device_mult = pool.speed_multiplier();
-                let candidates: Vec<CandidatePlan> = operators.iter().map(|fao| {
-                    CandidatePlan {
+                let candidates: Vec<CandidatePlan> = operators
+                    .iter()
+                    .map(|fao| CandidatePlan {
                         fao_ref: fao.clone(),
                         est_latency_ms: fao.est_latency_ms / device_mult,
                         est_accuracy: fao.est_accuracy,
                         est_cost: fao.est_latency_ms * 0.001 / device_mult,
-                    }
-                }).collect();
+                    })
+                    .collect();
 
                 // Check which dominate
                 for (i, c) in candidates.iter().enumerate() {
-                    let dominated = candidates.iter().enumerate().any(|(j, other)| {
-                        i != j && other.dominates(c)
-                    });
-                    let label = if dominated { "  ✗ dominated" } else { "  ★ frontier " };
+                    let dominated = candidates
+                        .iter()
+                        .enumerate()
+                        .any(|(j, other)| i != j && other.dominates(c));
+                    let label = if dominated {
+                        "  ✗ dominated"
+                    } else {
+                        "  ★ frontier "
+                    };
                     println!(
                         "{} {} v{}: latency={:.3}ms, accuracy={:.2}, cost={:.4}",
-                        label, c.fao_ref.function_id, c.fao_ref.version,
-                        c.est_latency_ms, c.est_accuracy, c.est_cost
+                        label,
+                        c.fao_ref.function_id,
+                        c.fao_ref.version,
+                        c.est_latency_ms,
+                        c.est_accuracy,
+                        c.est_cost
                     );
                 }
             }
@@ -416,9 +436,7 @@ async fn handle_dot_command(
             } else {
                 let parts: Vec<&str> = arg.splitn(2, ' ').collect();
                 let csv_path = parts[0];
-                let lance_path = parts.get(1).copied().unwrap_or_else(|| {
-                    csv_path
-                });
+                let lance_path = parts.get(1).copied().unwrap_or_else(|| csv_path);
                 let lance_output = if lance_path.ends_with(".lance") {
                     lance_path.to_string()
                 } else {
@@ -455,13 +473,17 @@ async fn handle_dot_command(
 
         ".model" => {
             if arg.is_empty() {
-                println!("Usage: .model load <onnx_path> [name] [features] [latency_ms] [accuracy]");
+                println!(
+                    "Usage: .model load <onnx_path> [name] [features] [latency_ms] [accuracy]"
+                );
             } else {
                 let parts: Vec<&str> = arg.splitn(6, ' ').collect();
                 match parts[0] {
                     "load" => {
                         if parts.len() < 2 {
-                            println!("Usage: .model load <onnx_path> [name] [features] [latency_ms] [accuracy]");
+                            println!(
+                                "Usage: .model load <onnx_path> [name] [features] [latency_ms] [accuracy]"
+                            );
                         } else {
                             let model_path = parts[1];
                             let func_name = parts.get(2).copied().unwrap_or_else(|| {
@@ -470,19 +492,21 @@ async fn handle_dot_command(
                                     .and_then(|s| s.to_str())
                                     .unwrap_or("model")
                             });
-                            let num_features: usize = parts.get(3)
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(3);
-                            let latency: f64 = parts.get(4)
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(1.0);
-                            let accuracy: f64 = parts.get(5)
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(0.95);
+                            let num_features: usize =
+                                parts.get(3).and_then(|s| s.parse().ok()).unwrap_or(3);
+                            let latency: f64 =
+                                parts.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0);
+                            let accuracy: f64 =
+                                parts.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.95);
 
                             match session.load_onnx_model_with_metrics(
-                                func_name, "1.0.0", model_path, func_name,
-                                num_features, latency, accuracy,
+                                func_name,
+                                "1.0.0",
+                                model_path,
+                                func_name,
+                                num_features,
+                                latency,
+                                accuracy,
                             ) {
                                 Ok(id) => println!(
                                     "✓ Loaded ONNX model '{func_name}' (id: {}, latency: {latency}ms, accuracy: {accuracy})",
@@ -500,7 +524,9 @@ async fn handle_dot_command(
         ".nl" => {
             if arg.is_empty() {
                 println!("Usage: .nl <rule_name> <table> <natural language description>");
-                println!("Example: .nl high_risk transactions Flag transactions with fraud probability above 90%");
+                println!(
+                    "Example: .nl high_risk transactions Flag transactions with fraud probability above 90%"
+                );
             } else {
                 let parts: Vec<&str> = arg.splitn(3, ' ').collect();
                 if parts.len() < 3 {
@@ -510,7 +536,10 @@ async fn handle_dot_command(
                     let table = parts[1];
                     let description = parts[2];
                     println!("Compiling NL → Datalog via LLM...");
-                    match session.register_logic_from_nl(name, table, description).await {
+                    match session
+                        .register_logic_from_nl(name, table, description)
+                        .await
+                    {
                         Ok(()) => {
                             // Show the generated rule.
                             let engine = session.logic_engine().read();
@@ -552,7 +581,8 @@ fn print_result(result: &QueryResult) {
 }
 
 fn print_banner(session: &Session) {
-    println!(r#"
+    println!(
+        r#"
     ╔══════════════════════════════════════════════════════════╗
     ║                                                          ║
     ║     █████╗ ███╗   ██╗ █████╗ ███╗   ███╗██████╗ ██████╗  ║
@@ -566,13 +596,23 @@ fn print_banner(session: &Session) {
     ║    v0.1.0-alpha                                          ║
     ║                                                          ║
     ╚══════════════════════════════════════════════════════════╝
-"#);
+"#
+    );
 
     println!("  Provenance: {:?}", session.config.provenance_mode);
-    println!("  Devices:    {} slots", session.device_pool().list_slots().len());
-    println!("  Models:     {} registered", session.models().list_models().len());
+    println!(
+        "  Devices:    {} slots",
+        session.device_pool().list_slots().len()
+    );
+    println!(
+        "  Models:     {} registered",
+        session.models().list_models().len()
+    );
     let llm_status = if session.config.llm_api_key.is_some() {
-        format!("✓ connected ({})", session.config.llm_model.as_deref().unwrap_or("gpt-4o"))
+        format!(
+            "✓ connected ({})",
+            session.config.llm_model.as_deref().unwrap_or("gpt-4o")
+        )
     } else {
         "✗ not configured".to_string()
     };

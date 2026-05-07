@@ -10,9 +10,7 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion_common::Result as DfResult;
 use datafusion_execution::TaskContext;
 use datafusion_physical_plan::stream::RecordBatchStreamAdapter;
-use datafusion_physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
-};
+use datafusion_physical_plan::{DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties};
 use futures::StreamExt;
 use parking_lot::RwLock;
 use tracing::debug;
@@ -116,9 +114,9 @@ impl ExecutionPlan for LogicFilterExec {
                         let engine_read = engine.read();
                         match engine_read.evaluate(&rule) {
                             Ok(results) => results.into_iter().next().map(Ok),
-                            Err(e) => Some(Err(
-                                datafusion_common::DataFusionError::External(Box::new(e))
-                            )),
+                            Err(e) => Some(Err(datafusion_common::DataFusionError::External(
+                                Box::new(e),
+                            ))),
                         }
                     }
                     Err(e) => Some(Err(e)),

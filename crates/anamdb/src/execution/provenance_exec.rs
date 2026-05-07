@@ -10,9 +10,7 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion_common::Result as DfResult;
 use datafusion_execution::TaskContext;
 use datafusion_physical_plan::stream::RecordBatchStreamAdapter;
-use datafusion_physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
-};
+use datafusion_physical_plan::{DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties};
 use futures::StreamExt;
 use tracing::debug;
 
@@ -133,9 +131,7 @@ impl ExecutionPlan for ProvenanceExec {
                                 ProvenanceMode::Boolean => {
                                     vec![1u8] // EXISTS = true
                                 }
-                                ProvenanceMode::Probability => {
-                                    1.0_f64.to_le_bytes().to_vec()
-                                }
+                                ProvenanceMode::Probability => 1.0_f64.to_le_bytes().to_vec(),
                                 ProvenanceMode::Polynomial => {
                                     let token = ProvenanceToken {
                                         model_ver_id: model_ver.clone(),
@@ -164,8 +160,9 @@ impl ExecutionPlan for ProvenanceExec {
                         columns.push(prov_array);
                     }
 
-                    RecordBatch::try_new(schema.clone(), columns)
-                        .map_err(|e| datafusion_common::DataFusionError::ArrowError(Box::new(e), None))
+                    RecordBatch::try_new(schema.clone(), columns).map_err(|e| {
+                        datafusion_common::DataFusionError::ArrowError(Box::new(e), None)
+                    })
                 }
                 Err(e) => Err(e),
             }

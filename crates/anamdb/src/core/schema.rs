@@ -135,7 +135,14 @@ mod tests {
     #[test]
     fn ai_models_schema_has_required_fields() {
         let schema = ai_models_schema();
-        for field in ["model_id", "name", "version", "format", "accuracy", "avg_latency_ms"] {
+        for field in [
+            "model_id",
+            "name",
+            "version",
+            "format",
+            "accuracy",
+            "avg_latency_ms",
+        ] {
             assert!(
                 schema.column_with_name(field).is_some(),
                 "ai_models schema missing {field}"

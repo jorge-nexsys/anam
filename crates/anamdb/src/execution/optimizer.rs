@@ -101,19 +101,14 @@ impl ParetoOptimizer {
 
     /// Parse a SQL query's `WITH (...)` clause into a clean SQL string and
     /// optional constraints.
-    pub fn parse_constraints(
-        &self,
-        query: &str,
-    ) -> Result<(String, Option<QueryConstraints>)> {
+    pub fn parse_constraints(&self, query: &str) -> Result<(String, Option<QueryConstraints>)> {
         // Look for `WITH (...)` at the end of the query.
         let query_trimmed = query.trim().trim_end_matches(';');
 
         if let Some(with_start) = query_trimmed.to_uppercase().rfind("WITH (") {
             let clean_sql = query_trimmed[..with_start].trim().to_string();
             let with_clause = &query_trimmed[with_start + 6..];
-            let with_body = with_clause
-                .trim_end_matches(')')
-                .trim();
+            let with_body = with_clause.trim_end_matches(')').trim();
 
             let mut constraints = QueryConstraints {
                 max_latency_ms: None,
@@ -169,7 +164,8 @@ impl ParetoOptimizer {
         // Log the optimization decision.
         let operators = self.registry.list_operators();
         if !operators.is_empty() {
-            let candidates = self.enumerate_candidates(&operators, batches.iter().map(|b| b.num_rows()).sum());
+            let candidates =
+                self.enumerate_candidates(&operators, batches.iter().map(|b| b.num_rows()).sum());
             let frontier = self.compute_pareto_frontier(&candidates);
             let feasible: Vec<_> = frontier
                 .iter()
@@ -223,9 +219,10 @@ impl ParetoOptimizer {
         let mut frontier = Vec::new();
 
         for (i, candidate) in candidates.iter().enumerate() {
-            let dominated = candidates.iter().enumerate().any(|(j, other)| {
-                i != j && other.dominates(candidate)
-            });
+            let dominated = candidates
+                .iter()
+                .enumerate()
+                .any(|(j, other)| i != j && other.dominates(candidate));
             if !dominated {
                 frontier.push(candidate.clone());
             }
@@ -252,7 +249,9 @@ mod tests {
         let optimizer = ParetoOptimizer::new(registry, pool);
 
         let (sql, constraints) = optimizer
-            .parse_constraints("SELECT * FROM HighRisk WITH (max_latency_ms = 50, min_accuracy = 0.95)")
+            .parse_constraints(
+                "SELECT * FROM HighRisk WITH (max_latency_ms = 50, min_accuracy = 0.95)",
+            )
             .unwrap();
 
         assert_eq!(sql, "SELECT * FROM HighRisk");
@@ -310,7 +309,10 @@ mod tests {
         // "dominated" should be excluded (worse latency AND cost than "fast",
         // worse accuracy than "accurate").
         assert_eq!(frontier.len(), 2);
-        let ids: Vec<_> = frontier.iter().map(|c| c.fao_ref.function_id.as_str()).collect();
+        let ids: Vec<_> = frontier
+            .iter()
+            .map(|c| c.fao_ref.function_id.as_str())
+            .collect();
         assert!(ids.contains(&"fast"));
         assert!(ids.contains(&"accurate"));
     }

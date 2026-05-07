@@ -10,8 +10,7 @@ mod bench_quick {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use crate::core::provenance::{
-        BoolSemiring, PolynomialSemiring, ProbSemiring, ProvenanceMode,
-        ProvenanceToken, Semiring,
+        BoolSemiring, PolynomialSemiring, ProbSemiring, ProvenanceMode, ProvenanceToken, Semiring,
     };
     use crate::logic::engine::LogicEngine;
 
@@ -55,7 +54,9 @@ mod bench_quick {
         let dt = start.elapsed();
         println!(
             "  BoolSemiring:   {:>7} ops in {:>6.2?}  ({:.1} M ops/sec)",
-            n, dt, n as f64 / dt.as_secs_f64() / 1e6
+            n,
+            dt,
+            n as f64 / dt.as_secs_f64() / 1e6
         );
 
         // Probability semiring
@@ -67,7 +68,9 @@ mod bench_quick {
         let dt = start.elapsed();
         println!(
             "  ProbSemiring:   {:>7} ops in {:>6.2?}  ({:.1} M ops/sec)",
-            n, dt, n as f64 / dt.as_secs_f64() / 1e6
+            n,
+            dt,
+            n as f64 / dt.as_secs_f64() / 1e6
         );
 
         // Polynomial semiring
@@ -84,7 +87,9 @@ mod bench_quick {
         let dt = start.elapsed();
         println!(
             "  PolySemiring:   {:>7} ops in {:>6.2?}  ({:.1} K ops/sec)",
-            1000, dt, 1000.0 / dt.as_secs_f64() / 1e3
+            1000,
+            dt,
+            1000.0 / dt.as_secs_f64() / 1e3
         );
 
         // Polynomial serde roundtrip
@@ -102,7 +107,9 @@ mod bench_quick {
         let dt = start.elapsed();
         println!(
             "  Poly serde:     {:>7} ops in {:>6.2?}  ({:.1} K ops/sec)",
-            n, dt, n as f64 / dt.as_secs_f64() / 1e3
+            n,
+            dt,
+            n as f64 / dt.as_secs_f64() / 1e3
         );
     }
 
@@ -120,9 +127,7 @@ mod bench_quick {
                     "fraud_prob > 0.90 AND amount > 10000 AND region = 'EU'",
                 )
                 .unwrap();
-            engine
-                .add_facts("fraud_prob", vec![batch])
-                .unwrap();
+            engine.add_facts("fraud_prob", vec![batch]).unwrap();
 
             // Warmup
             let _ = engine.evaluate("high_risk").unwrap();
@@ -153,14 +158,14 @@ mod bench_quick {
         let monitor = SemanticMonitor::new(0.5);
 
         for n in [100, 1_000, 10_000] {
-            let schema = Arc::new(Schema::new(vec![
-                Field::new("fraud_prob", DataType::Float64, false),
-            ]));
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "fraud_prob",
+                DataType::Float64,
+                false,
+            )]));
             let values: Vec<f64> = (0..n).map(|i| (i as f64 % 100.0) / 100.0).collect();
-            let batch = RecordBatch::try_new(
-                schema,
-                vec![Arc::new(Float64Array::from(values))],
-            ).unwrap();
+            let batch =
+                RecordBatch::try_new(schema, vec![Arc::new(Float64Array::from(values))]).unwrap();
 
             let iterations = 1000;
             let start = Instant::now();

@@ -30,5 +30,5 @@ pub mod storage;
 mod bench_quick;
 
 // Re-export the primary public API surface.
-pub use crate::core::session::Session;
 pub use crate::core::error::{AnamError, Result};
+pub use crate::core::session::Session;

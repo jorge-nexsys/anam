@@ -28,11 +28,7 @@ impl NlCompiler {
     ///
     /// If no API key is provided, `compile()` will return an error explaining
     /// that the NL compiler is unconfigured.
-    pub fn new(
-        api_key: Option<String>,
-        endpoint: Option<String>,
-        model: Option<String>,
-    ) -> Self {
+    pub fn new(api_key: Option<String>, endpoint: Option<String>, model: Option<String>) -> Self {
         Self {
             api_key,
             endpoint: endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),

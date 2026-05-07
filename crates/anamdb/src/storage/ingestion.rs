@@ -6,8 +6,8 @@ use arrow_array::RecordBatch;
 use arrow_array::RecordBatchIterator;
 use arrow_schema::Schema;
 use datafusion::arrow::csv::ReaderBuilder as CsvReaderBuilder;
-use lance::dataset::{WriteMode, WriteParams};
 use lance::Dataset;
+use lance::dataset::{WriteMode, WriteParams};
 use tracing::{info, instrument};
 
 use crate::core::error::{AnamError, Result};
@@ -39,14 +39,13 @@ pub async fn ingest_csv(csv_path: &str, lance_path: &str) -> Result<()> {
         .map_err(AnamError::Arrow)?;
 
     if batches.is_empty() {
-        return Err(AnamError::Lance("CSV file produced no record batches".into()));
+        return Err(AnamError::Lance(
+            "CSV file produced no record batches".into(),
+        ));
     }
 
     // Write to Lance using RecordBatchIterator.
-    let batch_reader = RecordBatchIterator::new(
-        batches.into_iter().map(Ok),
-        schema,
-    );
+    let batch_reader = RecordBatchIterator::new(batches.into_iter().map(Ok), schema);
 
     let params = WriteParams {
         mode: WriteMode::Create,
@@ -79,10 +78,7 @@ pub async fn ingest_batches(
         return Err(AnamError::Lance("no record batches to ingest".into()));
     }
 
-    let batch_reader = RecordBatchIterator::new(
-        batches.into_iter().map(Ok),
-        schema,
-    );
+    let batch_reader = RecordBatchIterator::new(batches.into_iter().map(Ok), schema);
 
     let params = WriteParams {
         mode,

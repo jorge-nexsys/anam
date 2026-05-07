@@ -7,10 +7,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::TableProvider;
 use datafusion::datasource::memory::MemTable;
-use dashmap::DashMap;
 use futures::TryStreamExt;
 use lance::Dataset;
 use tracing::{info, instrument};
@@ -46,8 +46,7 @@ impl LanceTableManager {
 
         let provider = self.scan_to_memtable(&dataset).await?;
 
-        self.datasets
-            .insert(path.to_string(), PathBuf::from(path));
+        self.datasets.insert(path.to_string(), PathBuf::from(path));
 
         Ok(provider)
     }
@@ -64,7 +63,8 @@ impl LanceTableManager {
         let dataset = Dataset::open(path)
             .await
             .map_err(|e| AnamError::Lance(format!("failed to open dataset at '{path}': {e}")))?;
-        dataset.checkout_version(version)
+        dataset
+            .checkout_version(version)
             .await
             .map_err(|e| AnamError::Lance(format!("failed to checkout version {version}: {e}")))?;
 
@@ -81,14 +81,11 @@ impl LanceTableManager {
 
         // Project all user columns explicitly to avoid internal lance columns.
         let lance_schema = dataset.schema();
-        let field_names: Vec<String> = lance_schema
-            .fields
-            .iter()
-            .map(|f| f.name.clone())
-            .collect();
+        let field_names: Vec<String> = lance_schema.fields.iter().map(|f| f.name.clone()).collect();
 
         if !field_names.is_empty() {
-            scanner.project(&field_names)
+            scanner
+                .project(&field_names)
                 .map_err(|e| AnamError::Lance(format!("projection failed: {e}")))?;
         }
 
@@ -104,10 +101,8 @@ impl LanceTableManager {
             // Empty dataset — derive schema from Lance.
             let arrow_schema: arrow_schema::Schema = arrow_schema::Schema::from(lance_schema);
             let schema: SchemaRef = Arc::new(arrow_schema);
-            let provider = Arc::new(
-                MemTable::try_new(schema, vec![vec![]])
-                    .map_err(AnamError::DataFusion)?
-            );
+            let provider =
+                Arc::new(MemTable::try_new(schema, vec![vec![]]).map_err(AnamError::DataFusion)?);
             return Ok(provider);
         }
 
@@ -120,10 +115,8 @@ impl LanceTableManager {
             "loaded Lance dataset into memory"
         );
 
-        let provider = Arc::new(
-            MemTable::try_new(schema, vec![batches])
-                .map_err(AnamError::DataFusion)?
-        );
+        let provider =
+            Arc::new(MemTable::try_new(schema, vec![batches]).map_err(AnamError::DataFusion)?);
 
         Ok(provider)
     }

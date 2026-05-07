@@ -149,10 +149,7 @@ impl DevicePool {
         {
             match Self::detect_metal_devices(&mut slot_id) {
                 Ok(metal_slots) => {
-                    info!(
-                        count = metal_slots.len(),
-                        "detected Metal GPU devices"
-                    );
+                    info!(count = metal_slots.len(), "detected Metal GPU devices");
                     slots.extend(metal_slots);
                 }
                 Err(e) => {
@@ -166,10 +163,7 @@ impl DevicePool {
         {
             match Self::detect_cuda_devices(&mut slot_id) {
                 Ok(cuda_slots) => {
-                    info!(
-                        count = cuda_slots.len(),
-                        "detected CUDA GPU devices"
-                    );
+                    info!(count = cuda_slots.len(), "detected CUDA GPU devices");
                     slots.extend(cuda_slots);
                 }
                 Err(e) => {
@@ -197,12 +191,14 @@ impl DevicePool {
             }
         }
 
-        let slot_loads: Vec<AtomicUsize> =
-            (0..slots.len()).map(|_| AtomicUsize::new(0)).collect();
+        let slot_loads: Vec<AtomicUsize> = (0..slots.len()).map(|_| AtomicUsize::new(0)).collect();
 
         info!(
             total_slots = slots.len(),
-            gpu_slots = slots.iter().filter(|s| matches!(s.device_type, DeviceType::CudaGpu | DeviceType::MetalGpu)).count(),
+            gpu_slots = slots
+                .iter()
+                .filter(|s| matches!(s.device_type, DeviceType::CudaGpu | DeviceType::MetalGpu))
+                .count(),
             "device pool initialized"
         );
 
@@ -227,8 +223,8 @@ impl DevicePool {
             .map_err(|e| AnamError::Dispatch(format!("failed to run system_profiler: {e}")))?;
 
         if output.status.success() {
-            let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-                .unwrap_or(serde_json::Value::Null);
+            let json: serde_json::Value =
+                serde_json::from_slice(&output.stdout).unwrap_or(serde_json::Value::Null);
 
             // Extract GPU names from system profiler output.
             if let Some(displays) = json.get("SPDisplaysDataType").and_then(|v| v.as_array()) {
@@ -289,10 +285,12 @@ impl DevicePool {
             .map_err(|e| AnamError::Dispatch(format!("CUDA device enumeration failed: {e}")))?;
 
         for ordinal in 0..device_count {
-            let dev = CudaDevice::new(ordinal)
-                .map_err(|e| AnamError::Dispatch(format!("CUDA device {ordinal} init failed: {e}")))?;
+            let dev = CudaDevice::new(ordinal).map_err(|e| {
+                AnamError::Dispatch(format!("CUDA device {ordinal} init failed: {e}"))
+            })?;
 
-            let (free, total) = dev.mem_get_info()
+            let (free, total) = dev
+                .mem_get_info()
                 .map_err(|e| AnamError::Dispatch(format!("CUDA mem query failed: {e}")))?;
 
             let name = format!("CUDA:{ordinal}");

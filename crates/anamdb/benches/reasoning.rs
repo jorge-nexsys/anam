@@ -1,6 +1,6 @@
 //! Benchmark: Reasoning Latency, Proof Trace Overhead, and Throughput.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::sync::Arc;
 
 use datafusion::arrow::array::{Float64Array, RecordBatch, StringArray};

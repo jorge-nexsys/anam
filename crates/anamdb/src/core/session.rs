@@ -290,7 +290,7 @@ impl Session {
         function_id: &str,
         num_input_features: usize,
     ) -> Result<String> {
-        use crate::model::ai_tables::{AiModelEntry, ModelFormat, DeviceAffinity};
+        use crate::model::ai_tables::{AiModelEntry, DeviceAffinity, ModelFormat};
         use crate::model::onnx_adapter::OnnxFaoOperator;
         use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
@@ -301,14 +301,14 @@ impl Session {
             .map(|i| Field::new(format!("feature_{i}"), DataType::Float32, false))
             .collect();
         let input_schema = Arc::new(Schema::new(input_fields));
-        let output_schema = Arc::new(Schema::new(vec![
-            Field::new("score", DataType::Float64, false),
-        ]));
+        let output_schema = Arc::new(Schema::new(vec![Field::new(
+            "score",
+            DataType::Float64,
+            false,
+        )]));
 
         // Load the ONNX model.
-        let file_size = std::fs::metadata(model_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(model_path).map(|m| m.len()).unwrap_or(0);
 
         let entry = AiModelEntry::builder(name, "1.0.0")
             .format(ModelFormat::Onnx)
@@ -335,8 +335,7 @@ impl Session {
             1.0,
             0.95,
         )?;
-        self.model_registry
-            .register_operator(Arc::new(operator))?;
+        self.model_registry.register_operator(Arc::new(operator))?;
 
         info!(model_id = %model_id, "ONNX model registered");
         Ok(model_id)
@@ -357,23 +356,31 @@ impl Session {
         avg_latency_ms: f64,
         accuracy: f64,
     ) -> Result<String> {
-        use crate::model::ai_tables::{AiModelEntry, ModelFormat, DeviceAffinity};
+        use crate::model::ai_tables::{AiModelEntry, DeviceAffinity, ModelFormat};
         use crate::model::onnx_adapter::OnnxFaoOperator;
         use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
-        info!(name, version, model_path, function_id, avg_latency_ms, accuracy, "loading ONNX model variant");
+        info!(
+            name,
+            version,
+            model_path,
+            function_id,
+            avg_latency_ms,
+            accuracy,
+            "loading ONNX model variant"
+        );
 
         let input_fields: Vec<Field> = (0..num_input_features)
             .map(|i| Field::new(format!("feature_{i}"), DataType::Float32, false))
             .collect();
         let input_schema = Arc::new(Schema::new(input_fields));
-        let output_schema = Arc::new(Schema::new(vec![
-            Field::new("score", DataType::Float64, false),
-        ]));
+        let output_schema = Arc::new(Schema::new(vec![Field::new(
+            "score",
+            DataType::Float64,
+            false,
+        )]));
 
-        let file_size = std::fs::metadata(model_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(model_path).map(|m| m.len()).unwrap_or(0);
 
         let entry = AiModelEntry::builder(name, version)
             .format(ModelFormat::Onnx)
@@ -397,8 +404,7 @@ impl Session {
             avg_latency_ms,
             accuracy,
         )?;
-        self.model_registry
-            .register_operator(Arc::new(operator))?;
+        self.model_registry.register_operator(Arc::new(operator))?;
 
         info!(model_id = %model_id, "ONNX model variant registered");
         Ok(model_id)
@@ -406,10 +412,7 @@ impl Session {
 
     // ── Internal helpers ───────────────────────────────────────────────
 
-    fn build_reasoning_tree(
-        &self,
-        batches: &[RecordBatch],
-    ) -> Result<Option<String>> {
+    fn build_reasoning_tree(&self, batches: &[RecordBatch]) -> Result<Option<String>> {
         if self.config.provenance_mode == ProvenanceMode::Boolean {
             return Ok(None);
         }
@@ -427,10 +430,7 @@ impl Session {
                             let bytes = binary_arr.value(row);
                             match PolynomialSemiring::from_bytes(bytes) {
                                 Ok(poly) => {
-                                    tree.push_str(&format!(
-                                        "  row {row}: {}\n",
-                                        poly.explain()
-                                    ));
+                                    tree.push_str(&format!("  row {row}: {}\n", poly.explain()));
                                 }
                                 Err(_) => {
                                     tree.push_str(&format!(

@@ -102,9 +102,7 @@ impl ModelRegistry {
         self.operators
             .get(&key)
             .map(|op| Arc::clone(op.value()))
-            .ok_or_else(|| {
-                AnamError::ModelNotFound(format!("{function_id}@{version}"))
-            })
+            .ok_or_else(|| AnamError::ModelNotFound(format!("{function_id}@{version}")))
     }
 
     /// Look up the latest version of an FAO operator by function ID.

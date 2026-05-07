@@ -5,7 +5,9 @@
 
 use std::collections::HashMap;
 
-use datafusion::arrow::array::{Array, ArrayRef, Float64Array, RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::array::{
+    Array, ArrayRef, Float64Array, RecordBatch, StringArray, UInt64Array,
+};
 use datafusion::arrow::compute;
 use datafusion::arrow::datatypes::DataType;
 use tracing::{debug, info, instrument};
@@ -211,10 +213,12 @@ impl LogicEngine {
                 match col.data_type() {
                     DataType::Float64 => {
                         if let Some(arr) = col.as_any().downcast_ref::<Float64Array>() {
-                            let threshold: f64 = condition
-                                .value
-                                .parse()
-                                .map_err(|_| AnamError::Logic(format!("invalid numeric value: {}", condition.value)))?;
+                            let threshold: f64 = condition.value.parse().map_err(|_| {
+                                AnamError::Logic(format!(
+                                    "invalid numeric value: {}",
+                                    condition.value
+                                ))
+                            })?;
                             for i in 0..num_rows {
                                 let is_valid = nulls.map_or(true, |n| n.is_valid(i));
                                 if mask[i] && is_valid {
@@ -223,8 +227,12 @@ impl LogicEngine {
                                         FilterOp::Lt => arr.value(i) < threshold,
                                         FilterOp::Gte => arr.value(i) >= threshold,
                                         FilterOp::Lte => arr.value(i) <= threshold,
-                                        FilterOp::Eq => (arr.value(i) - threshold).abs() < f64::EPSILON,
-                                        FilterOp::Neq => (arr.value(i) - threshold).abs() >= f64::EPSILON,
+                                        FilterOp::Eq => {
+                                            (arr.value(i) - threshold).abs() < f64::EPSILON
+                                        }
+                                        FilterOp::Neq => {
+                                            (arr.value(i) - threshold).abs() >= f64::EPSILON
+                                        }
                                     };
                                 }
                             }
@@ -262,13 +270,11 @@ impl LogicEngine {
         let new_columns: Vec<ArrayRef> = (0..batch.num_columns())
             .map(|col_idx| {
                 let col = batch.column(col_idx);
-                compute::take(col, &indices_array, None)
-                    .unwrap_or_else(|_| col.clone())
+                compute::take(col, &indices_array, None).unwrap_or_else(|_| col.clone())
             })
             .collect();
 
-        RecordBatch::try_new(batch.schema(), new_columns)
-            .map_err(AnamError::Arrow)
+        RecordBatch::try_new(batch.schema(), new_columns).map_err(AnamError::Arrow)
     }
 
     fn validate_datalog(&self, source: &str) -> Result<()> {
@@ -339,7 +345,10 @@ mod tests {
     fn register_and_list_rules() {
         let mut engine = LogicEngine::new(ProvenanceMode::Boolean).unwrap();
         engine
-            .register_rule("test", "high_risk(X) :- transactions(X), X.fraud_prob > 0.9")
+            .register_rule(
+                "test",
+                "high_risk(X) :- transactions(X), X.fraud_prob > 0.9",
+            )
             .unwrap();
         assert_eq!(engine.list_rules().len(), 1);
     }

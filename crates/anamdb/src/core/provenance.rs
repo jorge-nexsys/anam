@@ -42,10 +42,18 @@ pub trait Semiring: Clone + fmt::Debug + Send + Sync + 'static {
 pub struct BoolSemiring(pub bool);
 
 impl Semiring for BoolSemiring {
-    fn zero() -> Self { BoolSemiring(false) }
-    fn one()  -> Self { BoolSemiring(true) }
-    fn add(&self, other: &Self) -> Self { BoolSemiring(self.0 || other.0) }
-    fn mul(&self, other: &Self) -> Self { BoolSemiring(self.0 && other.0) }
+    fn zero() -> Self {
+        BoolSemiring(false)
+    }
+    fn one() -> Self {
+        BoolSemiring(true)
+    }
+    fn add(&self, other: &Self) -> Self {
+        BoolSemiring(self.0 || other.0)
+    }
+    fn mul(&self, other: &Self) -> Self {
+        BoolSemiring(self.0 && other.0)
+    }
 
     fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(vec![self.0 as u8])
@@ -69,8 +77,12 @@ impl Semiring for BoolSemiring {
 pub struct ProbSemiring(pub f64);
 
 impl Semiring for ProbSemiring {
-    fn zero() -> Self { ProbSemiring(0.0) }
-    fn one()  -> Self { ProbSemiring(1.0) }
+    fn zero() -> Self {
+        ProbSemiring(0.0)
+    }
+    fn one() -> Self {
+        ProbSemiring(1.0)
+    }
 
     fn add(&self, other: &Self) -> Self {
         // Independent-OR: P(A ∨ B) = 1 − (1−P(A))(1−P(B))

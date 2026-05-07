@@ -4,9 +4,9 @@
 //! version-stamped functions. This allows the system to swap models at
 //! plan-time and track exactly which implementation derived each tuple.
 
+use async_trait::async_trait;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::Schema;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::core::error::Result;

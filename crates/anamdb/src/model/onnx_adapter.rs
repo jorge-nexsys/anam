@@ -5,9 +5,9 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use datafusion::arrow::array::{Array, ArrayRef, Float32Array, Float64Array, RecordBatch};
 use datafusion::arrow::datatypes::{DataType, Schema};
-use async_trait::async_trait;
 use ort::session::Session as OrtSession;
 use parking_lot::Mutex;
 use tracing::{debug, instrument};
@@ -131,20 +131,15 @@ impl FaoOperator for OnnxFaoOperator {
             let (_shape, data) = output
                 .try_extract_tensor::<f32>()
                 .map_err(|e| AnamError::Inference(format!("output extraction failed: {e}")))?;
-            data.iter()
-                .map(|v| *v as f64)
-                .collect()
+            data.iter().map(|v| *v as f64).collect()
         } else {
             return Err(AnamError::Inference("model produced no outputs".into()));
         };
 
         // Build output RecordBatch with the score column.
         let score_array: ArrayRef = Arc::new(Float64Array::from(output_values));
-        let output_batch = RecordBatch::try_new(
-            self.output_schema.clone(),
-            vec![score_array],
-        )
-        .map_err(AnamError::Arrow)?;
+        let output_batch = RecordBatch::try_new(self.output_schema.clone(), vec![score_array])
+            .map_err(AnamError::Arrow)?;
 
         Ok(output_batch)
     }
