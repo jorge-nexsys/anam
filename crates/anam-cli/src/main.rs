@@ -278,13 +278,15 @@ async fn handle_dot_command(
         }
 
         ".rules" => {
-            let rules = session
-                .logic_engine()
-                .read()
-                .list_rules()
+            let engine = session.logic_engine().read();
+            let rule_names = engine.list_rules();
+            let rules: Vec<(String, String)> = rule_names
                 .iter()
-                .map(|r| (r.name.clone(), r.datalog_source.clone()))
-                .collect::<Vec<_>>();
+                .map(|name| {
+                    let body = engine.get_rule_body(name).unwrap_or_default();
+                    (name.clone(), body)
+                })
+                .collect();
             if rules.is_empty() {
                 println!("No Datalog rules registered.");
             } else {
@@ -330,12 +332,13 @@ async fn handle_dot_command(
             println!();
             println!("─── Datalog Rules ──────────────────────────────────────");
             let engine = session.logic_engine().read();
-            let rules = engine.list_rules();
-            if rules.is_empty() {
+            let rule_names = engine.list_rules();
+            if rule_names.is_empty() {
                 println!("  (none)");
             } else {
-                for rule in &rules {
-                    println!("  • {} ← {}", rule.name, rule.datalog_source);
+                for name in &rule_names {
+                    let body = engine.get_rule_body(name).unwrap_or_default();
+                    println!("  • {name} ← {body}");
                 }
             }
             drop(engine);
@@ -544,10 +547,9 @@ async fn handle_dot_command(
                         Ok(()) => {
                             // Show the generated rule.
                             let engine = session.logic_engine().read();
-                            let rules = engine.list_rules();
-                            if let Some(rule) = rules.iter().find(|r| r.name == name) {
+                            if let Some(body) = engine.get_rule_body(name) {
                                 println!("✓ Generated and registered rule '{name}':");
-                                println!("  Datalog: {}", rule.datalog_source);
+                                println!("  Datalog: {body}");
                             } else {
                                 println!("✓ Registered rule '{name}'");
                             }
