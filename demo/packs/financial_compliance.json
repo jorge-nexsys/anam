@@ -1,0 +1,41 @@
+{
+  "name": "financial_compliance",
+  "version": "1.0.0",
+  "description": "EU AML/KYC compliance rules for transaction monitoring. Flags high-risk transactions based on fraud probability, transaction amount, and merchant type.",
+  "author": "NexSys Consulting",
+  "rules": [
+    {
+      "name": "high_risk",
+      "datalog": "fraud_prob > 0.90 AND amount > 10000",
+      "description": "Flag any transaction with >90% fraud probability and amount exceeding $10,000"
+    },
+    {
+      "name": "wire_alert",
+      "datalog": "merchant_type = 'wire_transfer' AND amount > 50000",
+      "description": "Flag wire transfers exceeding $50,000 for enhanced due diligence"
+    },
+    {
+      "name": "velocity_check",
+      "datalog": "amount > 5000 AND fraud_prob > 0.70",
+      "description": "Flag medium-high risk transactions for velocity pattern analysis"
+    }
+  ],
+  "models": [
+    {
+      "name": "fraud_detector",
+      "artifact_path": "demo/models/fraud_detector.onnx",
+      "num_features": 3,
+      "avg_latency_ms": 5.0,
+      "accuracy": 0.95,
+      "description": "High-accuracy fraud detection model — 3 input features (amount, merchant_type_encoded, hour_of_day)"
+    },
+    {
+      "name": "fraud_fast",
+      "artifact_path": "demo/models/fraud_detector.onnx",
+      "num_features": 3,
+      "avg_latency_ms": 0.5,
+      "accuracy": 0.75,
+      "description": "Low-latency fraud screening — trades accuracy for 10x speed"
+    }
+  ]
+}

@@ -20,11 +20,11 @@ This roadmap outlines the path from our current single-node logic kernel to a fu
 ## Phase 2: Beta — Developer Experience (UX) & Agentic Trust
 *Focus: Decentralizing business logic via SDKs, automating rule generation, and implementing interactive debugging.*
 
-- [ ] **"Logic Pack" SDK:** Release a modular Rust and Python SDK allowing third-party developers to build domain-specific neurosymbolic rulesets (e.g., Healthcare, Financial Compliance).
-- [ ] **LLM-Assisted Rule Generation:** Build the conversational intent translation pipeline that uses an embedded LLM to parse natural language constraints into strict, differentiable Datalog. 
-- [ ] **Syntactic Self-Repair:** Develop a two-agent loop (Reviewer & Rewriter) to automatically patch structural errors (like unsupported file formats) on the fly without aborting queries.
-- [ ] **Semantic Anomaly Resolution (HITL):** Implement the Agentic Semantic Monitor to detect logically valid but contextually bizarre outputs (e.g., suspicious uniform confidence scores). The system will pause anomalous data paths and yield to the user for interactive triage.
-- [ ] **Query Result Explainer:** Add natural language lineage querying, allowing users to ask for coarse-grained pipeline summaries or fine-grained tuple derivations via the SDK.
+- [x] **"Logic Pack" SDK:** Release a modular Rust and Python SDK allowing third-party developers to build domain-specific neurosymbolic rulesets (e.g., Healthcare, Financial Compliance).
+- [x] **LLM-Assisted Rule Generation:** Build the conversational intent translation pipeline that uses an embedded LLM to parse natural language constraints into strict, differentiable Datalog. 
+- [x] **Syntactic Self-Repair:** Develop a two-agent loop (Reviewer & Rewriter) to automatically patch structural errors (like unsupported file formats) on the fly without aborting queries.
+- [x] **Semantic Anomaly Resolution (HITL):** Implement the Agentic Semantic Monitor to detect logically valid but contextually bizarre outputs (e.g., suspicious uniform confidence scores). The system will pause anomalous data paths and yield to the user for interactive triage.
+- [x] **Query Result Explainer:** Add natural language lineage querying, allowing users to ask for coarse-grained pipeline summaries or fine-grained tuple derivations via the SDK.
 
 ---
 

@@ -1,4 +1,4 @@
-# AxiomDB System Specifications (v1.0)
+# AnamDB System Specifications (v1.0)
 **Release Date:** Q1 2027
 **Status:** v1.0 Production Specification
 **Architecture:** Distributed Neurosymbolic Kernel & Multi-Agent Reasoning Plane
@@ -7,12 +7,12 @@
 ---
 
 ## 1. System Architecture Evolution
-While the Alpha and Beta releases established a single-node, heterogeneity-native engine with an interactive SDK, the v1.0 release introduces the **Distributed Reasoning Plane**. AxiomDB v1.0 scales logical inference and neural perception across multi-agent clusters. The system transitions from a localized database into a distributed cognitive engine, ensuring that agents can collaborate, share verified knowledge, and execute complex workflows in dynamically changing environments.
+While the Alpha and Beta releases established a single-node, heterogeneity-native engine with an interactive SDK, the v1.0 release introduces the **Distributed Reasoning Plane**. AnamDB v1.0 scales logical inference and neural perception across multi-agent clusters. The system transitions from a localized database into a distributed cognitive engine, ensuring that agents can collaborate, share verified knowledge, and execute complex workflows in dynamically changing environments.
 
 ---
 
 ## 2. The 5-Stage Symbolic Integration Pipeline
-To standardize how neural and symbolic components interact across a distributed cluster, AxiomDB v1.0 formally adopts a 5-stage symbolic integration framework:
+To standardize how neural and symbolic components interact across a distributed cluster, AnamDB v1.0 formally adopts a 5-stage symbolic integration framework:
 1.  **Data Preprocessing:** Raw input (e.g., text, video, distributed logs) is transposed into structured vector-symbolic representations.
 2.  **Neural-Symbolic Embedding:** Neural networks extract features utilizing first-order logic and mathematical constraints integrated directly within the network nodes to guarantee early-stage adherence to business logic. 
 3.  **Domain Knowledge Incorporation:** Extracted features are cross-referenced with distributed symbolic representations and domain ontologies to provide prior knowledge inference.
@@ -29,8 +29,8 @@ Managing rules and raw data across a distributed cluster requires robust consist
 ---
 
 ## 4. Multi-Agent Task Planning & Execution
-AxiomDB v1.0 acts as the central coordination layer for autonomous agent clusters.
-*   **Plugin Framework for Multi-Agent Systems:** AxiomDB utilizes a plugin-based architecture allowing symbolic task planning to operate in parallel with neural reinforcement learning across multiple agents.
+AnamDB v1.0 acts as the central coordination layer for autonomous agent clusters.
+*   **Plugin Framework for Multi-Agent Systems:** AnamDB utilizes a plugin-based architecture allowing symbolic task planning to operate in parallel with neural reinforcement learning across multiple agents.
 *   **Function-as-Operator (FAO) Routing:** Following the FAO paradigm, each step in a distributed query or agent workflow is compiled into an explicit, version-stamped function. The central query engine can route perception functions (e.g., running an NPU-accelerated OCR model) to edge nodes, while reserving symbolic join functions for high-memory core nodes.
 
 ---

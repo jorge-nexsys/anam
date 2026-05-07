@@ -411,6 +411,109 @@ impl Session {
         Ok(model_id)
     }
 
+    // ── Beta API: Logic Pack SDK ─────────────────────────────────────────
+
+    /// Load a Logic Pack into this session.
+    ///
+    /// Registers all bundled rules and models from the pack.
+    #[instrument(skip(self, pack), fields(pack_name = %pack.name, pack_version = %pack.version))]
+    pub fn load_logic_pack(&self, pack: &crate::sdk::LogicPack) -> Result<String> {
+        info!(
+            name = %pack.name,
+            version = %pack.version,
+            rules = pack.rules.len(),
+            models = pack.models.len(),
+            "loading Logic Pack"
+        );
+
+        // Register all rules.
+        let mut engine = self.logic_engine.write();
+        for rule in &pack.rules {
+            engine.register_rule(&rule.name, &rule.datalog)?;
+        }
+        drop(engine);
+
+        // Register all model references.
+        for model in &pack.models {
+            self.load_onnx_model_with_metrics(
+                &model.name,
+                &pack.version,
+                &model.artifact_path,
+                &model.name,
+                model.num_features,
+                model.avg_latency_ms,
+                model.accuracy,
+            )?;
+        }
+
+        let summary = pack.summary();
+        info!("Logic Pack loaded successfully");
+        Ok(summary)
+    }
+
+    // ── Beta API: Query Explainer ────────────────────────────────────────
+
+    /// Generate an explanation of the last query results.
+    ///
+    /// - `Coarse`: High-level summary (rules, models, stats, hardware).
+    /// - `Fine`: Per-row provenance trace with source record lineage.
+    pub fn explain_query(
+        &self,
+        batches: &[RecordBatch],
+        level: crate::hitl::explainer::ExplainLevel,
+    ) -> Result<crate::hitl::explainer::QueryExplanation> {
+        let engine = self.logic_engine.read();
+        let rules: Vec<(String, String)> = engine
+            .list_rules()
+            .into_iter()
+            .map(|name| {
+                let body = engine
+                    .get_rule_body(&name)
+                    .unwrap_or_else(|| "<unknown>".to_string());
+                (name, body)
+            })
+            .collect();
+
+        let models: Vec<(String, String)> = self
+            .model_registry
+            .list_models()
+            .into_iter()
+            .map(|e| (e.name.clone(), e.version.clone()))
+            .collect();
+
+        let context = crate::hitl::explainer::ExplainContext {
+            rules,
+            models,
+            provenance_mode: format!("{:?}", self.config.provenance_mode),
+            device_summary: self.device_pool.summary(),
+        };
+
+        crate::hitl::explainer::Explainer::explain(level, batches, &context)
+    }
+
+    // ── Beta API: Self-Repair ────────────────────────────────────────────
+
+    /// Trigger the syntactic self-repair agent for a failed operation.
+    pub fn self_repair(
+        &self,
+        error_msg: &str,
+        operator_name: &str,
+        context: &str,
+    ) -> Result<crate::hitl::self_repair::RepairReport> {
+        let mut agent = crate::hitl::self_repair::SelfRepairAgent::new();
+
+        // Provide available model names for swap recommendations.
+        let model_names: Vec<String> = self
+            .model_registry
+            .list_models()
+            .into_iter()
+            .map(|e| e.name.clone())
+            .collect();
+        agent.register_available_models(model_names);
+
+        agent.diagnose_and_repair(error_msg, operator_name, context)
+    }
+
     // ── Internal helpers ───────────────────────────────────────────────
 
     fn build_reasoning_tree(&self, batches: &[RecordBatch]) -> Result<Option<String>> {

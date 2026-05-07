@@ -14,7 +14,8 @@
 //! - [`logic`] — Differentiable Datalog engine (Scallop) and NL-to-Logic compiler.
 //! - [`execution`] — Extended DataFusion operators, Pareto optimizer, and heterogeneous dispatch.
 //! - [`storage`] — Lance-backed table provider with snapshot versioning.
-//! - [`hitl`] — Human-in-the-Loop semantic monitoring and interactive triage.
+//! - [`hitl`] — Human-in-the-Loop semantic monitoring, self-repair, and interactive triage.
+//! - [`sdk`] — Logic Pack SDK for building distributable domain-specific rulesets.
 
 #![deny(clippy::all)]
 #![warn(missing_docs)]
@@ -24,6 +25,7 @@ pub mod execution;
 pub mod hitl;
 pub mod logic;
 pub mod model;
+pub mod sdk;
 pub mod storage;
 
 #[cfg(test)]

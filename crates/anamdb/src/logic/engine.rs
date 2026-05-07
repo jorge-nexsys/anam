@@ -81,9 +81,14 @@ impl LogicEngine {
         }
     }
 
-    /// List all registered rules.
-    pub fn list_rules(&self) -> Vec<&LogicRule> {
-        self.rules.values().collect()
+    /// List all registered rule names.
+    pub fn list_rules(&self) -> Vec<String> {
+        self.rules.keys().cloned().collect()
+    }
+
+    /// Get the Datalog source body of a named rule.
+    pub fn get_rule_body(&self, name: &str) -> Option<String> {
+        self.rules.get(name).map(|r| r.datalog_source.clone())
     }
 
     /// Add facts (ground tuples) for a relation.
