@@ -6,7 +6,9 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn};
+#[cfg(any(target_os = "macos", feature = "cuda"))]
+use tracing::warn;
+use tracing::{debug, info};
 
 use crate::core::error::{AnamError, Result};
 
@@ -444,6 +446,7 @@ impl DevicePool {
 }
 
 /// Parse a memory string like "8 GB" or "16384 MB" into bytes.
+#[cfg(target_os = "macos")]
 fn parse_memory_string(s: &str) -> u64 {
     let s = s.trim();
     let parts: Vec<&str> = s.split_whitespace().collect();
@@ -499,6 +502,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn parse_memory() {
         assert_eq!(parse_memory_string("8 GB"), 8 * 1024 * 1024 * 1024);
         assert_eq!(parse_memory_string("16384 MB"), 16384 * 1024 * 1024);
