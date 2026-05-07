@@ -13,6 +13,11 @@
 #   Phase 6  │  HITL Monitoring      Semantic anomaly detection
 #   Phase 7  │  Provenance Tracing   Full reasoning trace (.explain)
 #
+#   ── Beta ──
+#   Phase 8  │  Logic Pack SDK       Load domain-specific rule bundles
+#   Phase 9  │  Self-Repair          Two-agent error diagnosis + patching
+#   Phase 10 │  Query Explainer      Coarse + fine-grained NL explanations
+#
 # Requirements:
 #   - Rust toolchain (cargo)
 #   - .env with OPENAI_API_KEY (for NL compilation)
@@ -38,7 +43,7 @@ echo "  ║    ██╔══██║██║╚██╗██║██╔�
 echo "  ║    ██║  ██║██║ ╚████║██║  ██║██║ ╚═╝ ██║██████╔╝██████╔╝ ║"
 echo "  ║    ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚═════╝  ║"
 echo "  ║                                                          ║"
-echo "  ║    Full Neurosymbolic Pipeline Demo                      ║"
+echo "  ║    Full Neurosymbolic Pipeline Demo (Alpha + Beta)        ║"
 echo "  ║                                                          ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo ""
@@ -113,13 +118,110 @@ DEMO_SCRIPT
 
 echo ""
 echo "══════════════════════════════════════════════════════════════"
-echo "  Demo Complete ✓"
+echo "  Alpha Pipeline Complete ✓"
+echo "══════════════════════════════════════════════════════════════"
+echo ""
+
+# ── Beta: Logic Pack SDK ────────────────────────────────────────────
+
+echo "══════════════════════════════════════════════════════════════"
+echo "  Phase 8 — Logic Pack SDK"
+echo "══════════════════════════════════════════════════════════════"
+echo ""
+
+if [ -f "demo/packs/financial_compliance.json" ]; then
+    echo "  Logic Pack: demo/packs/financial_compliance.json"
+    echo ""
+    echo "  ┌─────────────────────────────────────────────────────────┐"
+    echo "  │ Logic Packs bundle rules + models into one JSON file.  │"
+    echo "  │ A developer loads the pack with one function call —    │"
+    echo "  │ no Datalog expertise required.                         │"
+    echo "  └─────────────────────────────────────────────────────────┘"
+    echo ""
+    echo "  Contents:"
+    python3 -c "
+import json, sys
+with open('demo/packs/financial_compliance.json') as f:
+    pack = json.load(f)
+print(f'    Name:    {pack["name"]} v{pack["version"]}')
+print(f'    Author:  {pack.get("author", "N/A")}')
+print(f'    Rules:   {len(pack["rules"])}')
+for r in pack['rules']:
+    print(f'      • {r["name"]} ← {r["datalog"]}')
+print(f'    Models:  {len(pack["models"])}')
+for m in pack['models']:
+    print(f'      ◆ {m["name"]} — {m["avg_latency_ms"]}ms, {m["accuracy"]*100:.0f}% accuracy')
+" 2>/dev/null || echo "    (python3 not available — see the JSON directly)"
+    echo ""
+    echo "  ✓ Logic Pack ready for session.load_logic_pack()"
+else
+    echo "  ⚠ Logic Pack not found at demo/packs/financial_compliance.json"
+fi
+echo ""
+
+# ── Beta: Self-Repair Agent ─────────────────────────────────────────
+
+echo "══════════════════════════════════════════════════════════════"
+echo "  Phase 9 — Syntactic Self-Repair Agent"
+echo "══════════════════════════════════════════════════════════════"
+echo ""
+echo "  ┌─────────────────────────────────────────────────────────┐"
+echo "  │ When a FAO operator fails, the engine doesn't abort.   │"
+echo "  │                                                         │"
+echo "  │ 1. Reviewer Agent → diagnoses the root cause           │"
+echo "  │ 2. Rewriter Agent → proposes a corrective action       │"
+echo "  │    (model swap, skip rows, or escalate to user)        │"
+echo "  └─────────────────────────────────────────────────────────┘"
+echo ""
+echo "  Error classifiers:"
+echo "    • Dimension mismatch   → Recoverable (swap model)"
+echo "    • Timeout exceeded     → Recoverable (swap to faster)"
+echo "    • Null / missing data  → Recoverable (retry with adjustment)"
+echo "    • Unsupported format   → Degraded (skip + continue)"
+echo "    • Out of memory        → Degraded (degraded mode)"
+echo "    • Unknown error        → Fatal (escalate to user)"
+echo ""
+echo "  ✓ Self-Repair Agent available via session.self_repair()"
+echo ""
+
+# ── Beta: Query Explainer ───────────────────────────────────────────
+
+echo "══════════════════════════════════════════════════════════════"
+echo "  Phase 10 — Query Result Explainer"
+echo "══════════════════════════════════════════════════════════════"
+echo ""
+echo "  ┌─────────────────────────────────────────────────────────┐"
+echo "  │ Two explanation modes:                                  │"
+echo "  │                                                         │"
+echo "  │  Coarse — Pipeline summary: rules, models, stats, HW  │"
+echo "  │  Fine   — Per-row provenance: model ver, sources, etc  │"
+echo "  └─────────────────────────────────────────────────────────┘"
+echo ""
+echo "  ✓ Explainer available via session.explain_query()"
+echo ""
+
+# ── Run cargo test to verify everything ─────────────────────────────
+
+echo "══════════════════════════════════════════════════════════════"
+echo "  Running Test Suite (Alpha + Beta)"
+echo "══════════════════════════════════════════════════════════════"
+echo ""
+cargo test --quiet 2>&1 | tail -4
+echo ""
+
+echo "══════════════════════════════════════════════════════════════"
+echo "  Demo Complete ✓  (Alpha + Beta)"
 echo ""
 echo "  To explore interactively:"
 echo "    cargo run -- --gpu"
 echo ""
-echo "  Try these commands in the REPL:"
+echo "  Alpha commands:"
 echo "    .nl suspicious transactions Flag late-night wire transfers over 50K"
-echo "    SELECT * FROM txns WHERE fraud_prob > 0.90 WITH (max_latency_ms=50)"
+echo "    SELECT * FROM txns WHERE fraud_prob > 0.90"
 echo "    .explain"
+echo ""
+echo "  Beta APIs (Rust SDK):"
+echo "    session.load_logic_pack(&pack)     # Load a Logic Pack"
+echo "    session.explain_query(&batches, ..) # NL explanation"
+echo "    session.self_repair(error, op, ctx) # Auto-repair FAO errors"
 echo "══════════════════════════════════════════════════════════════"
