@@ -7,8 +7,7 @@ use std::collections::HashMap;
 
 use datafusion::arrow::array::{Array, ArrayRef, Float64Array, RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::compute;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use std::sync::Arc;
+use datafusion::arrow::datatypes::DataType;
 use tracing::{debug, info, instrument};
 
 use crate::core::error::{AnamError, Result};

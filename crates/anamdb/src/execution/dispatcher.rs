@@ -4,9 +4,7 @@
 //! and schedules fine-grained execution jobs across them.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
@@ -180,6 +178,25 @@ impl DevicePool {
             }
         }
 
+        // ── nvidia-smi fallback (no CUDA runtime needed) ──────────────
+        #[cfg(not(feature = "cuda"))]
+        {
+            match Self::detect_nvidia_smi_devices(&mut slot_id) {
+                Ok(nvidia_slots) => {
+                    if !nvidia_slots.is_empty() {
+                        info!(
+                            count = nvidia_slots.len(),
+                            "detected NVIDIA GPUs via nvidia-smi"
+                        );
+                        slots.extend(nvidia_slots);
+                    }
+                }
+                Err(e) => {
+                    debug!("nvidia-smi not available: {e}");
+                }
+            }
+        }
+
         let slot_loads: Vec<AtomicUsize> =
             (0..slots.len()).map(|_| AtomicUsize::new(0)).collect();
 
@@ -289,6 +306,51 @@ impl DevicePool {
                 speed_factor: 50.0, // NVIDIA GPUs are ~50x for dense compute.
             });
             *slot_id += 1;
+        }
+
+        Ok(devices)
+    }
+
+    /// Detect NVIDIA GPUs via `nvidia-smi` CLI (no CUDA runtime needed).
+    ///
+    /// This is a fallback for systems where the `cuda` cargo feature is not
+    /// enabled but an NVIDIA GPU is present.
+    #[cfg(not(feature = "cuda"))]
+    fn detect_nvidia_smi_devices(slot_id: &mut usize) -> Result<Vec<DeviceSlot>> {
+        use std::process::Command;
+
+        let output = Command::new("nvidia-smi")
+            .args([
+                "--query-gpu=name,memory.free,memory.total",
+                "--format=csv,noheader,nounits",
+            ])
+            .output()
+            .map_err(|e| AnamError::Dispatch(format!("nvidia-smi not found: {e}")))?;
+
+        if !output.status.success() {
+            return Ok(Vec::new());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut devices = Vec::new();
+
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+            if parts.len() >= 3 {
+                let name = parts[0].to_string();
+                let free_mib: u64 = parts[1].parse().unwrap_or(0);
+                let total_mib: u64 = parts[2].parse().unwrap_or(0);
+
+                devices.push(DeviceSlot {
+                    id: *slot_id,
+                    device_type: DeviceType::CudaGpu,
+                    name: format!("CUDA: {name}"),
+                    available_memory_bytes: free_mib * 1024 * 1024,
+                    total_memory_bytes: total_mib * 1024 * 1024,
+                    speed_factor: 50.0,
+                });
+                *slot_id += 1;
+            }
         }
 
         Ok(devices)

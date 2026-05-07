@@ -9,6 +9,7 @@ use datafusion::arrow::array::{Array, ArrayRef, Float32Array, Float64Array, Reco
 use datafusion::arrow::datatypes::{DataType, Schema};
 use async_trait::async_trait;
 use ort::session::Session as OrtSession;
+use parking_lot::Mutex;
 use tracing::{debug, instrument};
 
 use crate::core::error::{AnamError, Result};
@@ -20,7 +21,7 @@ pub struct OnnxFaoOperator {
     function_id: String,
     version: String,
     model_id: String,
-    session: OrtSession,
+    session: Mutex<OrtSession>,
     input_schema: Arc<Schema>,
     output_schema: Arc<Schema>,
     avg_latency_ms: f64,
@@ -51,7 +52,7 @@ impl OnnxFaoOperator {
             function_id: function_id.into(),
             version: version.into(),
             model_id: model_id.into(),
-            session,
+            session: Mutex::new(session),
             input_schema,
             output_schema,
             avg_latency_ms,
@@ -120,19 +121,17 @@ impl FaoOperator for OnnxFaoOperator {
             .map_err(|e| AnamError::Inference(format!("tensor creation failed: {e}")))?;
 
         // Run inference.
-        let outputs = self
-            .session
+        let mut session = self.session.lock();
+        let outputs = session
             .run(ort::inputs![input_tensor])
             .map_err(|e| AnamError::Inference(format!("inference failed: {e}")))?;
 
         // Extract output (assume single output).
         let output_values: Vec<f64> = if let Some((_name, output)) = outputs.iter().next() {
-            let tensor = output
+            let (_shape, data) = output
                 .try_extract_tensor::<f32>()
                 .map_err(|e| AnamError::Inference(format!("output extraction failed: {e}")))?;
-            tensor.as_slice()
-                .ok_or_else(|| AnamError::Inference("could not get tensor slice".into()))?
-                .iter()
+            data.iter()
                 .map(|v| *v as f64)
                 .collect()
         } else {

@@ -2,7 +2,7 @@
 
 use dashmap::DashMap;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::core::error::{AnamError, Result};
 use crate::model::ai_tables::AiModelEntry;

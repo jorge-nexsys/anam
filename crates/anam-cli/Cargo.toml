@@ -21,3 +21,4 @@ tracing-subscriber.workspace = true
 anyhow.workspace = true
 datafusion.workspace = true
 dirs-next = "2"
+dotenvy = { workspace = true }

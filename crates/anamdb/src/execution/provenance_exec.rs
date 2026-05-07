@@ -165,7 +165,7 @@ impl ExecutionPlan for ProvenanceExec {
                     }
 
                     RecordBatch::try_new(schema.clone(), columns)
-                        .map_err(|e| datafusion_common::DataFusionError::ArrowError(e, None))
+                        .map_err(|e| datafusion_common::DataFusionError::ArrowError(Box::new(e), None))
                 }
                 Err(e) => Err(e),
             }

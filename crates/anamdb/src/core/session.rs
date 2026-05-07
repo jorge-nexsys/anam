@@ -270,6 +270,140 @@ impl Session {
         &self.model_registry
     }
 
+    /// Access the logic engine.
+    pub fn logic_engine(&self) -> &Arc<RwLock<LogicEngine>> {
+        &self.logic_engine
+    }
+
+    /// Access the heterogeneous device pool.
+    pub fn device_pool(&self) -> &DevicePool {
+        &self.device_pool
+    }
+
+    /// Load an ONNX model from disk and register it as both an AI-Table entry
+    /// and an FAO operator.
+    #[instrument(skip(self))]
+    pub fn load_onnx_model(
+        &self,
+        name: &str,
+        model_path: &str,
+        function_id: &str,
+        num_input_features: usize,
+    ) -> Result<String> {
+        use crate::model::ai_tables::{AiModelEntry, ModelFormat, DeviceAffinity};
+        use crate::model::onnx_adapter::OnnxFaoOperator;
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        info!(name, model_path, function_id, "loading ONNX model");
+
+        // Build input/output schemas for the operator.
+        let input_fields: Vec<Field> = (0..num_input_features)
+            .map(|i| Field::new(format!("feature_{i}"), DataType::Float32, false))
+            .collect();
+        let input_schema = Arc::new(Schema::new(input_fields));
+        let output_schema = Arc::new(Schema::new(vec![
+            Field::new("score", DataType::Float64, false),
+        ]));
+
+        // Load the ONNX model.
+        let file_size = std::fs::metadata(model_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        let entry = AiModelEntry::builder(name, "1.0.0")
+            .format(ModelFormat::Onnx)
+            .artifact_path(model_path)
+            .avg_latency_ms(1.0)
+            .accuracy(0.95)
+            .size_bytes(file_size)
+            .device_affinity(DeviceAffinity::Any)
+            .build();
+
+        let model_id = entry.model_id.clone();
+
+        // Register in AI-Tables catalog.
+        self.model_registry.register_model(entry)?;
+
+        // Create and register the FAO operator.
+        let operator = OnnxFaoOperator::load(
+            model_path,
+            function_id,
+            "1.0.0",
+            &model_id,
+            input_schema,
+            output_schema,
+            1.0,
+            0.95,
+        )?;
+        self.model_registry
+            .register_operator(Arc::new(operator))?;
+
+        info!(model_id = %model_id, "ONNX model registered");
+        Ok(model_id)
+    }
+
+    /// Load an ONNX model with custom performance metrics.
+    ///
+    /// Use this to register multiple model variants with different
+    /// latency/accuracy trade-offs for Pareto optimization.
+    #[instrument(skip(self))]
+    pub fn load_onnx_model_with_metrics(
+        &self,
+        name: &str,
+        version: &str,
+        model_path: &str,
+        function_id: &str,
+        num_input_features: usize,
+        avg_latency_ms: f64,
+        accuracy: f64,
+    ) -> Result<String> {
+        use crate::model::ai_tables::{AiModelEntry, ModelFormat, DeviceAffinity};
+        use crate::model::onnx_adapter::OnnxFaoOperator;
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
+        info!(name, version, model_path, function_id, avg_latency_ms, accuracy, "loading ONNX model variant");
+
+        let input_fields: Vec<Field> = (0..num_input_features)
+            .map(|i| Field::new(format!("feature_{i}"), DataType::Float32, false))
+            .collect();
+        let input_schema = Arc::new(Schema::new(input_fields));
+        let output_schema = Arc::new(Schema::new(vec![
+            Field::new("score", DataType::Float64, false),
+        ]));
+
+        let file_size = std::fs::metadata(model_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        let entry = AiModelEntry::builder(name, version)
+            .format(ModelFormat::Onnx)
+            .artifact_path(model_path)
+            .avg_latency_ms(avg_latency_ms)
+            .accuracy(accuracy)
+            .size_bytes(file_size)
+            .device_affinity(DeviceAffinity::Any)
+            .build();
+
+        let model_id = entry.model_id.clone();
+        self.model_registry.register_model(entry)?;
+
+        let operator = OnnxFaoOperator::load(
+            model_path,
+            function_id,
+            version,
+            &model_id,
+            input_schema,
+            output_schema,
+            avg_latency_ms,
+            accuracy,
+        )?;
+        self.model_registry
+            .register_operator(Arc::new(operator))?;
+
+        info!(model_id = %model_id, "ONNX model variant registered");
+        Ok(model_id)
+    }
+
     // ── Internal helpers ───────────────────────────────────────────────
 
     fn build_reasoning_tree(

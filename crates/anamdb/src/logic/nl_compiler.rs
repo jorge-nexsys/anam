@@ -5,7 +5,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument};
 
 use crate::core::error::{AnamError, Result};
 

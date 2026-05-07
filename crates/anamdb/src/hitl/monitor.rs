@@ -5,7 +5,7 @@
 //! unexpected or contradictory.
 
 use datafusion::arrow::array::{Array, Float64Array, RecordBatch};
-use tracing::{debug, warn};
+use tracing::warn;
 
 use crate::core::error::Result;
 use crate::hitl::triage::Anomaly;
@@ -52,9 +52,17 @@ impl SemanticMonitor {
                     confidence_threshold: 0.5,
                     max_low_pct: 0.8,
                 },
+                AnomalyHeuristic::LowConfidenceRate {
+                    confidence_column: "fraud_prob",
+                    confidence_threshold: 0.5,
+                    max_low_pct: 0.8,
+                },
                 AnomalyHeuristic::EmptyResultSet,
                 AnomalyHeuristic::UniformScores {
                     score_column: "confidence",
+                },
+                AnomalyHeuristic::UniformScores {
+                    score_column: "fraud_prob",
                 },
             ],
         }

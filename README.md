@@ -93,7 +93,8 @@ AnamDB is Vertical-Agnostic. It provides the kernel; you provide the "Logic Pack
 
 ## Roadmap
 
-- [ ] **Pre-Alpha:** Embedded Rust Engine with basic Datalog support.
-- [ ] **Alpha (Current):** Implement explicit Model Manager (AI-Tables) and Multi-Objective Query Optimizer (Pareto balancing).
+- [x] **Pre-Alpha:** Embedded Rust Engine with basic Datalog support.
+- [x] **Alpha (Current):** Implement explicit Model Manager (AI-Tables) and Multi-Objective Query Optimizer (Pareto balancing).
 - [ ] **Beta:** "Logic Pack" SDK with an Interactive Human-in-the-Loop debugging channel for resolving semantic anomalies.
 - [ ] **v1.0:** Distributed "Reasoning Plane" for multi-agent clusters with automated LLM-to-Datalog generation pipelines.
+
