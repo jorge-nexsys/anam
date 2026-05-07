@@ -1,100 +1,175 @@
-# AnamDB (MVP) 
-### *The AI-Native, Differentiable Logic Kernel for Autonomous Agents*
+# AnamDB
+### *The AI-Native Neurosymbolic Database Engine*
 
-**AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It is designed to natively integrate probabilistic neural perception with deterministic symbolic reasoning into a unified architecture. 
+**AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It natively integrates probabilistic neural perception with deterministic symbolic reasoning into a unified architecture — from a single-node kernel to a distributed multi-agent reasoning plane.
 
-Unlike traditional vector databases that rely on semantic similarity ("vibes") or bolt-on LLMs, AnamDB treats **Models as First-Class Citizens** and **Logic as a Verifiable Blueprint**. It enables agents to perform rigorous reasoning over multi-modal unstructured data while balancing execution speed and accuracy dynamically.
+Unlike traditional vector databases that rely on semantic similarity or bolt-on LLMs, AnamDB treats **Models as First-Class Citizens** and **Logic as a Verifiable Blueprint**.
 
 ---
 
-## 🧠 Why AnamDB?
+## Why AnamDB?
 
-Traditional RAG (Retrieval-Augmented Generation) is hitting the "Trust Wall," while standard databases cannot natively reason over unstructured data. AnamDB bridges this gap by addressing the core challenges of AI-native data management:
-
-* **LLM-Assisted Rule Generation:** Overcome the UX bottleneck of manual logic programming. AnamDB allows users to define constraints in natural language, which are automatically compiled into verifiable Datalog rules.
-* **Multi-Objective Query Optimization:** Neural operators force a trade-off between speed and accuracy. Our optimizer explicitly calculates the Pareto frontier, dynamically selecting the best model and execution path based on your latency and cost constraints. 
-* **Explicit Model Management (AI-Tables):** AI models are managed natively alongside data. "AI-Tables" store metadata (inference speed, accuracy, versioning) for all available models, abstracting away the complexity of model lifecycles.
-* **Human-in-the-Loop Debugging:** When semantic anomalies occur (logically valid but contextually incorrect outputs), an agentic monitor pauses execution and interacts with the user to clarify intent and fix the logic on the fly.
-* **Verifiable Proof Traces:** Every query returns a "Reasoning Tree" (fine-grained lineage) proving exactly *how* a result was derived across heterogeneous data sources.
-* **Zero-Copy Performance:** Built on **Apache Arrow**, allowing neural models and the logic engine to share the same memory space for sub-millisecond local retrieval.
+| Capability | AnamDB | Vector DBs | SQL + ML | LLM Pipelines |
+|:---|:---|:---|:---|:---|
+| **Explainability** | Semiring provenance — every result traced to source | Similarity score only | No lineage | Black box |
+| **Safety** | Datalog guardrails block hallucinations at kernel level | None | Post-hoc validation | Prompt engineering |
+| **Optimization** | Pareto frontier (latency × accuracy × cost) | Latency only | Latency only | Token cost only |
+| **Hardware** | Metal / CUDA / NPU heterogeneous dispatch | CPU only | CPU + external GPU | API calls |
+| **Models** | AI-Tables — first-class model lifecycle management | External | External endpoints | Hardcoded |
+| **Human-in-Loop** | Semantic anomaly detection with interactive triage | Silent failures | Error logs | Chat-based retry |
+| **Distribution** | Network-aware task routing + global lineage | Sharding only | Federated queries | N/A |
 
 ---
 
 ## Tech Stack
 
-* **Core Engine:** Rust (using `tokio` for async execution).
-* **Query Optimizer:** Extended **Apache DataFusion** with custom Neuro-Operators and Multi-Objective Cost Modeling.
-* **Logic Layer:** Differentiable Datalog (via `scallop-core`).
-* **Model Manager:** Native registry utilizing **AI-Tables** and **Function-as-Operator (FAO)** architecture.
-* **Storage Format:** **Lance** (Optimized for hybrid Vector + Relational data).
-* **Inference:** ONNX Runtime / Burn (NPU-accelerated).
+| Layer | Component | Technology |
+|:---|:---|:---|
+| **Kernel** | Async runtime | Rust 2024 + `tokio` |
+| **Query Engine** | Optimizer + execution | Apache DataFusion (extended) |
+| **Logic** | Differentiable Datalog | `scallop-core` |
+| **Models** | AI-Tables + FAO registry | ONNX Runtime |
+| **Storage** | Columnar + vector | Lance 2.2 (Arrow-backed) |
+| **SDK** | Logic Packs + Explainer | JSON-based bundles |
+| **Distribution** | Task routing + BCNF catalog | Multi-agent cluster |
 
 ---
 
-## Quick Start (MVP Preview)
+## Quick Start
 
-AnamDB allows you to seamlessly join natural language constraints with raw perception and hard business logic.
+```bash
+# Clone and build
+git clone https://github.com/your-org/anam.git && cd anam
+cargo build
 
-### 1. Define Constraints via Natural Language
-Instead of writing raw Prolog, define your rules conversationally. The LLM translates this into strict Datalog.
-```rust
-// AnamDB parses: "Flag a transaction as 'High Risk' if the model is 90% sure it's 
-// fraudulent AND it exceeds $10k in the EU."
-ctx.register_logic_from_nl("HighRisk", "transactions", "fraud_prob > 0.90 AND amount > 10000 AND region = 'EU'").await?;
+# Set up LLM (optional, for .nl command)
+echo "OPENAI_API_KEY=sk-..." > .env
+
+# Run the full demo
+./demo/run_demo.sh
+
+# Or explore interactively
+cargo run -- --gpu
 ```
 
-### 2. Execute via Rust API with Cost Constraints
+### Interactive Session
+
+```
+anam> .ingest demo/data/transactions_large.csv demo/data/transactions_large.lance
+✓ Ingested 100,000 rows
+
+anam> .load demo/data/transactions_large.lance txns
+Registered table 'txns'
+
+anam> .model load demo/models/fraud_detector.onnx fraud_detector 3 5.0 0.95
+✓ Loaded ONNX model 'fraud_detector'
+
+anam> .logic high_risk "fraud_prob > 0.90 AND amount > 10000"
+✓ Registered rule 'high_risk'
+
+anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
+       FROM txns GROUP BY region ORDER BY avg_fraud DESC;
++--------+-------+-----------+
+| region | count | avg_fraud |
++--------+-------+-----------+
+| APAC   | 5321  | 0.7233    |
+| EU     | 36033 | 0.1374    |
+| US     | 48018 | 0.0800    |
++--------+-------+-----------+
+
+anam> .explain
+═══ AnamDB Reasoning Trace ═══
+  Provenance: Polynomial (full lineage tracking)
+  Rules: high_risk ← fraud_prob > 0.90 AND amount > 10000
+  Pareto Frontier: fraud_fast (0.050ms / 75%) ★ fraud_detector (0.500ms / 95%)
+```
+
+### Rust SDK
+
 ```rust
-use Anamdb::core::Session;
+use anamdb::sdk::LogicPack;
+use anamdb::core::session::Session;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let ctx = Session::new_with_npu().await?;
-    
-    // 1. Ingest raw data (Lance Format)
-    ctx.register_table("transactions", "data/tx_2026.lance").await?;
+    let session = Session::new().await?;
 
-    // 2. Run Neurosymbolic Query with a Multi-Objective Constraint
-    // The Model Manager automatically selects the optimal model from AI-Tables 
-    // to meet the latency/accuracy requirements (Pareto frontier calculation).
-    let query = "SELECT * FROM HighRisk WITH (max_latency_ms = 50, min_accuracy = 0.95)";
-    let mut results = ctx.sql(query).await?;
+    // Load a domain-specific Logic Pack (rules + models in one JSON)
+    let pack = LogicPack::from_file("demo/packs/financial_compliance.json")?;
+    session.load_logic_pack(&pack)?;
 
-    // 3. Human-in-the-Loop (HITL) Triage
-    // If the semantic monitor detects an anomaly or uncertainty, it yields for feedback.
-    if results.requires_clarification() {
-        let correction = "Only count EU transactions if they are outside of Germany.";
-        results = ctx.refine_query(correction).await?;
-    }
+    // Query with automatic Pareto optimization
+    let batches = session.query("SELECT * FROM HighRisk").await?;
 
-    // 4. Inspect the Proof Trace
-    results.explain_reasoning().await?;
-    
+    // Explain results with provenance tracing
+    let explanation = session.explain_query(&batches, ExplainLevel::Coarse)?;
+    println!("{}", explanation.display());
+
     Ok(())
 }
 ```
 
 ---
 
-## Architecture: The Kernel Strategy
+## Architecture
 
-AnamDB is Vertical-Agnostic. It provides the kernel; you provide the "Logic Packs."
+```
+ ┌──────────────────────────────────────────────────────────────────┐
+ │                     AnamDB v1.0 Coordinator                      │
+ │                                                                  │
+ │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────────────┐  │
+ │  │ BCNF Policy │ │ Distributed  │ │ Global Lineage           │  │
+ │  │ Catalog     │ │ Optimizer    │ │ Tracer                   │  │
+ │  └──────┬──────┘ └──────┬───────┘ └──────────┬───────────────┘  │
+ │         ▼               ▼                     ▼                  │
+ │  ┌──────────────────────────────────────────────────────────┐    │
+ │  │                    Task Router                            │    │
+ │  │     Perception → Edge  |  Symbolic → Core  |  Mixed → Hybrid │
+ │  └──────┬────────────────┬────────────────────┬─────────────┘    │
+ └─────────┼────────────────┼────────────────────┼─────────────────┘
+           │                │                    │
+    ┌──────▼──────┐  ┌──────▼──────┐  ┌──────────▼──────┐
+    │  Edge Node  │  │  Core Node  │  │  Hybrid Node    │
+    │  NPU + 4GB  │  │  64GB RAM   │  │  GPU + 32GB     │
+    │             │  │             │  │                  │
+    │ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────────┐ │
+    │ │ 5-Stage │ │  │ │ 5-Stage │ │  │ │ 5-Stage     │ │
+    │ │Pipeline │ │  │ │Pipeline │ │  │ │ Pipeline    │ │
+    │ └─────────┘ │  │ └─────────┘ │  │ └─────────────┘ │
+    └─────────────┘  └─────────────┘  └──────────────────┘
+```
 
-| Layer | Component | Function |
-| :--- | :--- | :--- |
-| **Interface** | NL-to-Logic + SQL | Conversational intent translation and standard query entry. |
-| **Agentic Monitor** | HITL Debugger | Detects semantic anomalies and interacts with users for on-the-fly correction. |
-| **Logic Layer** | Symbolic Engine | Compiles Datalog into differentiable logical circuits. |
-| **Model Manager** | AI-Tables & FAO | Manages AI models as first-class citizens, tracking inference speed, accuracy, and versioning. |
-| **Execution** | DataFusion (Extended)| Calculates the Pareto frontier to balance latency vs. accuracy for physical execution plans. |
-| **Storage** | Lance/Arrow | Columnar storage tracking fine-grained lineage and provenance. |
+---
+
+## Documentation
+
+| Document | Description |
+|:---|:---|
+| [DEMO.md](DEMO.md) | Full 17-step walkthrough with output examples |
+| [SPECS.md](SPECS.md) | System specifications (Alpha → Beta → v1.0) |
+| [ROADMAP.md](ROADMAP.md) | Development roadmap and status |
 
 ---
 
 ## Roadmap
 
-- [x] **Pre-Alpha:** Embedded Rust Engine with basic Datalog support.
-- [x] **Alpha (Current):** Implement explicit Model Manager (AI-Tables) and Multi-Objective Query Optimizer (Pareto balancing).
-- [ ] **Beta:** "Logic Pack" SDK with an Interactive Human-in-the-Loop debugging channel for resolving semantic anomalies.
-- [ ] **v1.0:** Distributed "Reasoning Plane" for multi-agent clusters with automated LLM-to-Datalog generation pipelines.
+- [x] **Alpha** — Kernel: Datalog engine, Lance storage, Semiring provenance, AI-Tables, Pareto optimizer, heterogeneous dispatch.
+- [x] **Beta** — Developer Experience: Logic Pack SDK, NL-to-Datalog compilation, syntactic self-repair, query explainer, interactive triage.
+- [x] **v1.0** — Distributed Reasoning Plane: 5-stage pipeline, BCNF policy catalog, multi-agent task routing, network-aware optimizer, global lineage.
+- [ ] **Beyond** — Ecosystem: Automated model distillation, spatial/temporal abstractions, community AI-Tables hub.
 
+---
+
+## Test Suite
+
+```
+$ cargo test
+
+test result: ok. 38 passed; 0 failed; 0 ignored
+```
+
+---
+
+<p align="center">
+<b>Every other database stores data. AnamDB reasons about it.</b>
+</p>
