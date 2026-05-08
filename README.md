@@ -1,6 +1,8 @@
 # AnamDB
 ### *The AI-Native Neurosymbolic Database Engine*
 
+![AnamDB Demo](demo.gif)
+
 **AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It natively integrates probabilistic neural perception with deterministic symbolic reasoning into a unified architecture — from a single-node kernel to a distributed multi-agent reasoning plane.
 
 Unlike traditional vector databases that rely on semantic similarity or bolt-on LLMs, AnamDB treats **Models as First-Class Citizens** and **Logic as a Verifiable Blueprint**.
@@ -37,22 +39,38 @@ Unlike traditional vector databases that rely on semantic similarity or bolt-on 
 
 ## Quick Start
 
+### 1. One-Liner Install
+
+If you have Rust installed, you can install the AnamDB CLI and server in seconds:
+
 ```bash
-# Clone and build
-git clone https://github.com/your-org/anam.git && cd anam
-cargo build
+cargo install --git https://github.com/jam5991/anam anam-cli
+```
 
-# Set up LLM (optional, for .nl command)
-echo "OPENAI_API_KEY=sk-..." > .env
+### 2. The "3-Minute Wow"
 
-# Run the full demo
-./demo/run_demo.sh
+Run the AnamDB interactive REPL:
 
-# Start the interactive REPL
-cargo run --bin anam
+```bash
+anam
+```
 
-# Or start the production-ready server
-cargo run --bin anam -- serve --port 8080
+Once inside, download a community model, load some data, and run a neurosymbolic SQL query:
+
+```sql
+-- 1. Download the community financial compliance pack
+anam> .hub install anamdb/financial-compliance@1.0.0
+
+-- 2. Ingest a sample dataset (100k rows)
+anam> .ingest demo/data/transactions_large.csv demo/data/transactions_large.lance
+anam> .load demo/data/transactions_large.lance txns
+
+-- 3. Run a SQL query that executes the neural model inline
+anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
+       FROM txns WHERE high_risk = true GROUP BY region ORDER BY avg_fraud DESC;
+
+-- 4. See exactly WHY the engine made those decisions
+anam> .explain
 ```
 
 ### Community Hub
@@ -60,11 +78,11 @@ cargo run --bin anam -- serve --port 8080
 AnamDB includes a built-in package manager for models and logic:
 
 ```bash
-# Search for community logic packs
-anam hub search fraud
+# Search for community logic packs inside the REPL
+anam> .hub search fraud
 
 # Install the financial compliance pack
-anam hub install anamdb/financial-compliance@1.0.0
+anam> .hub install anamdb/financial-compliance@1.0.0
 ```
 
 ### Interactive Session

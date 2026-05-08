@@ -191,6 +191,7 @@ async fn repl(session: Session) -> Result<()> {
     println!("\nType SQL queries, or use dot-commands:");
     println!("  .load <path>    — Register a Lance table (streaming)");
     println!("  .ingest <csv>   — Ingest CSV → Lance dataset");
+    println!("  .hub <action>   — AI-Tables Hub (search, install, list)");
     println!("  .logic <n> <d>  — Register a Datalog rule");
     println!("  .models         — List registered AI models");
     println!("  .rules          — List Datalog rules");
@@ -280,6 +281,59 @@ async fn handle_dot_command(
         ".quit" | ".exit" | ".q" => {
             println!("Goodbye.");
             return Ok(true);
+        }
+
+        ".hub" => {
+            if arg.is_empty() {
+                println!("Usage: .hub [search <keyword> | install <pack> | list]");
+            } else {
+                let parts: Vec<&str> = arg.splitn(2, ' ').collect();
+                let action = parts[0];
+                let target = parts.get(1).unwrap_or(&"");
+
+                let hub_dir = dirs_next::data_dir()
+                    .map(|d| d.join("anamdb").join("hub"))
+                    .unwrap_or_else(|| ".anam_hub".into());
+                
+                let mut hub = anamdb::sdk::hub::HubClient::new(&hub_dir)?;
+                
+                match action {
+                    "search" => {
+                        let results = hub.search(target);
+                        if results.is_empty() {
+                            println!("No packs found matching '{target}'.");
+                        } else {
+                            for r in results {
+                                println!("{}@{} — {}", r.name, r.version, r.description);
+                            }
+                        }
+                    }
+                    "install" => {
+                        if target.is_empty() {
+                            println!("Usage: .hub install <pack_name>");
+                        } else {
+                            println!("Installing {target}...");
+                            match hub.install(target) {
+                                Ok(res) => println!("✓ {}", res.message),
+                                Err(e) => println!("Failed to install: {e}"),
+                            }
+                        }
+                    }
+                    "list" => {
+                        let installed = hub.list_installed();
+                        if installed.is_empty() {
+                            println!("No packs installed.");
+                        } else {
+                            for r in installed {
+                                println!("{}@{}", r.name, r.version);
+                            }
+                        }
+                    }
+                    _ => {
+                        println!("Unknown hub action '{action}'. Usage: search, install, list.");
+                    }
+                }
+            }
         }
 
         ".load" => {
