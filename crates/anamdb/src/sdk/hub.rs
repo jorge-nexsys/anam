@@ -132,7 +132,7 @@ pub struct HubClient {
 
 impl HubClient {
     /// The default official registry URL.
-    pub const DEFAULT_REGISTRY: &'static str = "https://hub.anamdb.io";
+    pub const DEFAULT_REGISTRY: &'static str = "https://jam5991.github.io/anam/registry";
 
     /// Create a new hub client rooted at `hub_dir`.
     pub fn new(hub_dir: impl AsRef<Path>) -> Result<Self> {

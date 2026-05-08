@@ -6,3 +6,8 @@
 *.swo
 .DS_Store
 ROADMAP.md
+
+# Docs / Node
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

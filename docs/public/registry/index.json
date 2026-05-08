@@ -1,0 +1,66 @@
+{
+  "installed": {},
+  "available": {
+    "anamdb/financial-compliance@1.0.0": {
+      "name": "anamdb/financial-compliance",
+      "version": "1.0.0",
+      "description": "AML/KYC compliance rules + fraud detection models for financial data",
+      "author": "AnamDB Core Team",
+      "license": "BSL-1.1",
+      "tags": [
+        "fraud",
+        "finance",
+        "aml",
+        "kyc"
+      ],
+      "models": [
+        {
+          "name": "fraud_detector",
+          "path": "models/fraud_detector.onnx",
+          "num_features": 4,
+          "avg_latency_ms": 2.1,
+          "accuracy": 0.95
+        }
+      ],
+      "rules": [
+        {
+          "name": "high_risk_transactions",
+          "path": "rules/high_risk.dl",
+          "description": "Flags transactions > $10k with high fraud scores"
+        }
+      ],
+      "anamdb_version": ">=1.0.0"
+    },
+    "anamdb/medical-imaging@0.9.0": {
+      "name": "anamdb/medical-imaging",
+      "version": "0.9.0",
+      "description": "DICOM segmentation models + clinical Datalog constraints",
+      "author": "community",
+      "license": "BSL-1.1",
+      "tags": [
+        "medical",
+        "imaging",
+        "dicom",
+        "segmentation"
+      ],
+      "models": [
+        {
+          "name": "lesion_detector",
+          "path": "models/lesion_detector.onnx",
+          "num_features": 64,
+          "avg_latency_ms": 28.5,
+          "accuracy": 0.91
+        }
+      ],
+      "rules": [
+        {
+          "name": "critical_findings",
+          "path": "rules/critical.dl",
+          "description": "Escalates high-confidence lesion detections for radiologist review"
+        }
+      ],
+      "anamdb_version": ">=1.0.0"
+    }
+  },
+  "registry_url": "https://jam5991.github.io/anam/registry"
+}
