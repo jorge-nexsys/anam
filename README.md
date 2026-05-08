@@ -162,7 +162,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 |:---|:---|
 | [DEMO.md](DEMO.md) | Full 17-step walkthrough with output examples |
 | [SPECS.md](SPECS.md) | System specifications (Alpha → Beta → v1.0) |
-| [ROADMAP.md](ROADMAP.md) | Development roadmap and status |
 
 ---
 
