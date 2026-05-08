@@ -40,10 +40,7 @@ impl FaoScalarUdf {
         let name = operator.function_id().to_string();
 
         // Accept any number of numeric columns.
-        let signature = Signature::new(
-            TypeSignature::VariadicAny,
-            Volatility::Stable,
-        );
+        let signature = Signature::new(TypeSignature::VariadicAny, Volatility::Stable);
 
         Self {
             name,
@@ -101,10 +98,13 @@ impl ScalarUDFImpl for FaoScalarUdf {
                 ColumnarValue::Array(arr) => Ok(arr.clone()),
                 ColumnarValue::Scalar(s) => {
                     // Determine how many rows from a sibling array.
-                    let n = args.iter().find_map(|a| match a {
-                        ColumnarValue::Array(arr) => Some(arr.len()),
-                        _ => None,
-                    }).unwrap_or(1);
+                    let n = args
+                        .iter()
+                        .find_map(|a| match a {
+                            ColumnarValue::Array(arr) => Some(arr.len()),
+                            _ => None,
+                        })
+                        .unwrap_or(1);
                     s.to_array_of_size(n)
                 }
             })
@@ -127,24 +127,40 @@ impl ScalarUDFImpl for FaoScalarUdf {
                 match arr.data_type() {
                     DataType::Float32 => Ok(arr.clone()),
                     DataType::Float64 => {
-                        let f64_arr = arr.as_any().downcast_ref::<Float64Array>().ok_or_else(|| {
-                            datafusion_common::DataFusionError::Internal("expected Float64Array".into())
-                        })?;
-                        let f32_vals: Vec<f32> = f64_arr.values().iter().map(|v| *v as f32).collect();
+                        let f64_arr =
+                            arr.as_any().downcast_ref::<Float64Array>().ok_or_else(|| {
+                                datafusion_common::DataFusionError::Internal(
+                                    "expected Float64Array".into(),
+                                )
+                            })?;
+                        let f32_vals: Vec<f32> =
+                            f64_arr.values().iter().map(|v| *v as f32).collect();
                         Ok(Arc::new(Float32Array::from(f32_vals)) as ArrayRef)
                     }
                     DataType::Int64 => {
-                        let i64_arr = arr.as_any().downcast_ref::<datafusion::arrow::array::Int64Array>().ok_or_else(|| {
-                            datafusion_common::DataFusionError::Internal("expected Int64Array".into())
-                        })?;
-                        let f32_vals: Vec<f32> = i64_arr.values().iter().map(|v| *v as f32).collect();
+                        let i64_arr = arr
+                            .as_any()
+                            .downcast_ref::<datafusion::arrow::array::Int64Array>()
+                            .ok_or_else(|| {
+                                datafusion_common::DataFusionError::Internal(
+                                    "expected Int64Array".into(),
+                                )
+                            })?;
+                        let f32_vals: Vec<f32> =
+                            i64_arr.values().iter().map(|v| *v as f32).collect();
                         Ok(Arc::new(Float32Array::from(f32_vals)) as ArrayRef)
                     }
                     DataType::Int32 => {
-                        let i32_arr = arr.as_any().downcast_ref::<datafusion::arrow::array::Int32Array>().ok_or_else(|| {
-                            datafusion_common::DataFusionError::Internal("expected Int32Array".into())
-                        })?;
-                        let f32_vals: Vec<f32> = i32_arr.values().iter().map(|v| *v as f32).collect();
+                        let i32_arr = arr
+                            .as_any()
+                            .downcast_ref::<datafusion::arrow::array::Int32Array>()
+                            .ok_or_else(|| {
+                                datafusion_common::DataFusionError::Internal(
+                                    "expected Int32Array".into(),
+                                )
+                            })?;
+                        let f32_vals: Vec<f32> =
+                            i32_arr.values().iter().map(|v| *v as f32).collect();
                         Ok(Arc::new(Float32Array::from(f32_vals)) as ArrayRef)
                     }
                     other => Err(datafusion_common::DataFusionError::Plan(format!(
@@ -173,13 +189,10 @@ impl ScalarUDFImpl for FaoScalarUdf {
         // We spawn a blocking task on the current runtime.
         let operator = Arc::clone(&self.operator);
         let output_batch = tokio::task::block_in_place(move || {
-            tokio::runtime::Handle::current().block_on(async move {
-                operator.execute(input_batch).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async move { operator.execute(input_batch).await })
         })
-        .map_err(|e| {
-            datafusion_common::DataFusionError::External(Box::new(e))
-        })?;
+        .map_err(|e| datafusion_common::DataFusionError::External(Box::new(e)))?;
 
         // Extract the first (score) column from the output.
         if output_batch.num_columns() == 0 {

@@ -17,7 +17,6 @@
 //! SELECT distill_model('fraud_detector', target_latency_ms => 5.0) AS student_id;
 //! ```
 
-
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -163,7 +162,10 @@ impl DistillationEngine {
                 min_accuracy = config.min_accuracy,
                 "student did not meet Pareto criteria — discarding"
             );
-            (format!("{}_distilled_rejected", config.teacher_model_name), None)
+            (
+                format!("{}_distilled_rejected", config.teacher_model_name),
+                None,
+            )
         };
 
         let summary = if accepted {
@@ -204,10 +206,9 @@ impl DistillationEngine {
 
     fn find_teacher(&self, name: &str) -> Result<AiModelEntry> {
         let models = self.registry.list_models();
-        models
-            .into_iter()
-            .find(|m| m.name == name)
-            .ok_or_else(|| AnamError::Logic(format!("teacher model '{name}' not found in registry")))
+        models.into_iter().find(|m| m.name == name).ok_or_else(|| {
+            AnamError::Logic(format!("teacher model '{name}' not found in registry"))
+        })
     }
 
     /// Generate soft labels from the teacher's logits with temperature scaling.
@@ -274,11 +275,7 @@ struct StudentStats {
 
 /// Check whether a distillation result improves the Pareto frontier
 /// (i.e., is strictly better on at least one dimension without worsening the other).
-pub fn dominates_pareto(
-    new_lat: f64,
-    new_acc: f64,
-    frontier: &[(f64, f64)],
-) -> bool {
+pub fn dominates_pareto(new_lat: f64, new_acc: f64, frontier: &[(f64, f64)]) -> bool {
     // A new point dominates the frontier if no existing point is
     // simultaneously faster AND more accurate.
     frontier.iter().all(|(lat, acc)| {
@@ -307,7 +304,9 @@ mod tests {
     #[test]
     fn distillation_produces_faster_student() {
         let registry = ModelRegistry::new();
-        registry.register_model(make_entry("fraud_detector", 12.0, 0.95)).unwrap();
+        registry
+            .register_model(make_entry("fraud_detector", 12.0, 0.95))
+            .unwrap();
 
         let engine = DistillationEngine::new(registry);
         let config = DistillationConfig {
@@ -319,20 +318,39 @@ mod tests {
 
         let result = engine.distill(&config).unwrap();
 
-        assert!(result.student_latency_ms < result.teacher_latency_ms,
-            "student should be faster than teacher");
-        assert!(result.student_accuracy <= result.teacher_accuracy,
-            "student accuracy should not exceed teacher");
+        assert!(
+            result.student_latency_ms < result.teacher_latency_ms,
+            "student should be faster than teacher"
+        );
+        assert!(
+            result.student_accuracy <= result.teacher_accuracy,
+            "student accuracy should not exceed teacher"
+        );
         assert!(result.pareto_score > 0.0, "Pareto score must be positive");
-        assert!(result.accepted,
+        assert!(
+            result.accepted,
             "should be accepted: latency {:.1}ms <= {:.1}ms, accuracy {:.3} >= {:.3}",
-            result.student_latency_ms, config.target_latency_ms,
-            result.student_accuracy, config.min_accuracy);
+            result.student_latency_ms,
+            config.target_latency_ms,
+            result.student_accuracy,
+            config.min_accuracy
+        );
 
         println!("\n═══ Model Distillation Test ═══");
-        println!("  Teacher: {:.1}ms @ {:.1}% acc", result.teacher_latency_ms, result.teacher_accuracy * 100.0);
-        println!("  Student: {:.1}ms @ {:.1}% acc", result.student_latency_ms, result.student_accuracy * 100.0);
-        println!("  Speedup: {:.1}×", result.teacher_latency_ms / result.student_latency_ms);
+        println!(
+            "  Teacher: {:.1}ms @ {:.1}% acc",
+            result.teacher_latency_ms,
+            result.teacher_accuracy * 100.0
+        );
+        println!(
+            "  Student: {:.1}ms @ {:.1}% acc",
+            result.student_latency_ms,
+            result.student_accuracy * 100.0
+        );
+        println!(
+            "  Speedup: {:.1}×",
+            result.teacher_latency_ms / result.student_latency_ms
+        );
         println!("  Pareto:  {:.3}", result.pareto_score);
         println!("  {}", result.summary);
     }
@@ -340,13 +358,15 @@ mod tests {
     #[test]
     fn distillation_rejects_tight_targets() {
         let registry = ModelRegistry::new();
-        registry.register_model(make_entry("slow_model", 100.0, 0.60)).unwrap();
+        registry
+            .register_model(make_entry("slow_model", 100.0, 0.60))
+            .unwrap();
 
         let engine = DistillationEngine::new(registry);
         let config = DistillationConfig {
             teacher_model_name: "slow_model".into(),
-            target_latency_ms: 0.1,  // impossibly tight
-            min_accuracy: 0.99,      // impossibly high
+            target_latency_ms: 0.1, // impossibly tight
+            min_accuracy: 0.99,     // impossibly high
             ..Default::default()
         };
 
@@ -359,12 +379,15 @@ mod tests {
     fn pareto_dominance_check() {
         let frontier = vec![(10.0, 0.90), (5.0, 0.85)];
 
-        assert!(dominates_pareto(3.0, 0.87, &frontier),
-            "3ms @ 0.87 should dominate the frontier");
-        assert!(!dominates_pareto(12.0, 0.89, &frontier),
-            "12ms @ 0.89 should NOT dominate");
+        assert!(
+            dominates_pareto(3.0, 0.87, &frontier),
+            "3ms @ 0.87 should dominate the frontier"
+        );
+        assert!(
+            !dominates_pareto(12.0, 0.89, &frontier),
+            "12ms @ 0.89 should NOT dominate"
+        );
 
         println!("\n  ✓ Pareto dominance logic correct");
     }
 }
-

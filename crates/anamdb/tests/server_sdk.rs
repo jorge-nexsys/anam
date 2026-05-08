@@ -15,9 +15,9 @@ fn workspace_path(relative: &str) -> String {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn server_client_roundtrip() {
+    use anamdb::Session;
     use anamdb::client::{AnamClient, ClientConfig};
     use anamdb::server::AnamGrpcService;
-    use anamdb::Session;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::RwLock;
@@ -65,14 +65,11 @@ async fn server_client_roundtrip() {
                         if line.is_empty() {
                             continue;
                         }
-                        let cmd: serde_json::Value =
-                            serde_json::from_str(line).unwrap_or_default();
-                        let method =
-                            cmd.get("method").and_then(|v| v.as_str()).unwrap_or("");
+                        let cmd: serde_json::Value = serde_json::from_str(line).unwrap_or_default();
+                        let method = cmd.get("method").and_then(|v| v.as_str()).unwrap_or("");
                         let resp: serde_json::Value = match method {
                             "query" => {
-                                let sql =
-                                    cmd.get("sql").and_then(|v| v.as_str()).unwrap_or("");
+                                let sql = cmd.get("sql").and_then(|v| v.as_str()).unwrap_or("");
                                 match svc.query(sql).await {
                                     Ok(r) => serde_json::json!({
                                         "ok": true,
@@ -134,7 +131,10 @@ async fn server_client_roundtrip() {
     println!("  Server:  127.0.0.1:{}", addr.port());
     println!("  Health:  {}", health.status);
     println!("  Version: {}", health.version);
-    println!("  Query:   OK (reasoning tree: {} chars)", result.reasoning_tree.as_ref().unwrap().len());
+    println!(
+        "  Query:   OK (reasoning tree: {} chars)",
+        result.reasoning_tree.as_ref().unwrap().len()
+    );
     println!("  ✓ Server + Client SDK roundtrip works");
 
     server_handle.abort();

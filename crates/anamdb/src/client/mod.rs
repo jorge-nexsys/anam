@@ -77,10 +77,12 @@ impl AnamClient {
             TcpStream::connect(&self.config.addr),
         )
         .await
-        .map_err(|_| AnamError::Io(std::io::Error::new(
-            std::io::ErrorKind::TimedOut,
-            "connection timed out",
-        )))?
+        .map_err(|_| {
+            AnamError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "connection timed out",
+            ))
+        })?
         .map_err(AnamError::Io)?;
 
         self.stream = Some(BufReader::new(stream));
@@ -97,8 +99,8 @@ impl AnamClient {
             ))
         })?;
 
-        let mut cmd_str = serde_json::to_string(cmd)
-            .map_err(|e| AnamError::Serde(e.to_string()))?;
+        let mut cmd_str =
+            serde_json::to_string(cmd).map_err(|e| AnamError::Serde(e.to_string()))?;
         cmd_str.push('\n');
 
         reader
@@ -200,8 +202,16 @@ impl AnamClient {
         let resp = self.send_command(&cmd).await?;
 
         Ok(ServerHealth {
-            status: resp.get("status").and_then(|v| v.as_str()).unwrap_or("UNKNOWN").to_string(),
-            version: resp.get("version").and_then(|v| v.as_str()).unwrap_or("?").to_string(),
+            status: resp
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("UNKNOWN")
+                .to_string(),
+            version: resp
+                .get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+                .to_string(),
             table_count: resp.get("tables").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             model_count: resp.get("models").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             rule_count: resp.get("rules").and_then(|v| v.as_u64()).unwrap_or(0) as u32,

@@ -93,8 +93,10 @@ impl TableProvider for LanceStreamingProvider {
     fn supports_filters_pushdown(
         &self,
         filters: &[&Expr],
-    ) -> std::result::Result<Vec<datafusion::logical_expr::TableProviderFilterPushDown>, DataFusionError>
-    {
+    ) -> std::result::Result<
+        Vec<datafusion::logical_expr::TableProviderFilterPushDown>,
+        DataFusionError,
+    > {
         // Lance supports filter push-down for simple predicates.
         Ok(filters
             .iter()

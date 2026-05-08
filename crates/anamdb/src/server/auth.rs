@@ -1,5 +1,5 @@
 //! Authentication middleware for the AnamDB server.
-//! 
+//!
 //! Currently provides API key validation against a simple storage backend.
 //! In the future, this will tie into a robust tenant/billing database.
 

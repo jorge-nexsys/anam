@@ -149,8 +149,7 @@ path = "catalog.json"
             // Create empty catalog.
             let catalog_path = format!("{path}/catalog.json");
             if !std::path::Path::new(&catalog_path).exists() {
-                let _store =
-                    anamdb::storage::catalog::CatalogStore::open(&catalog_path)?;
+                let _store = anamdb::storage::catalog::CatalogStore::open(&catalog_path)?;
                 println!("  ✓ Created {catalog_path}");
             }
 

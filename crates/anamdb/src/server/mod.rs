@@ -5,9 +5,8 @@
 //! to full gRPC/tonic once tonic-build is integrated.
 
 pub mod auth;
-pub mod rate_limit;
 pub mod metering;
-
+pub mod rate_limit;
 
 use std::sync::Arc;
 
@@ -147,7 +146,7 @@ impl AnamGrpcService {
 
     /// Create a new service with a shared session.
     pub fn with_shared_session(session: Arc<RwLock<Session>>) -> Self {
-        Self { 
+        Self {
             session,
             authenticator: Arc::new(auth::DummyAuthenticator),
             rate_limiter: Arc::new(rate_limit::RateLimiter::new()),
@@ -168,13 +167,13 @@ impl AnamGrpcService {
             let schema = result.batches[0].schema();
 
             // Serialize schema.
-            let mut schema_writer = StreamWriter::try_new(&mut schema_bytes, &schema)
-                .map_err(AnamError::Arrow)?;
+            let mut schema_writer =
+                StreamWriter::try_new(&mut schema_bytes, &schema).map_err(AnamError::Arrow)?;
             schema_writer.finish().map_err(AnamError::Arrow)?;
 
             // Serialize all batches into a single IPC stream.
-            let mut writer = StreamWriter::try_new(&mut ipc_bytes, &schema)
-                .map_err(AnamError::Arrow)?;
+            let mut writer =
+                StreamWriter::try_new(&mut ipc_bytes, &schema).map_err(AnamError::Arrow)?;
             for batch in &result.batches {
                 writer.write(batch).map_err(AnamError::Arrow)?;
             }
@@ -215,11 +214,7 @@ impl AnamGrpcService {
     }
 
     /// Register a Datalog rule.
-    pub async fn register_rule(
-        &self,
-        name: &str,
-        datalog: &str,
-    ) -> proto::RegisterRuleResponse {
+    pub async fn register_rule(&self, name: &str, datalog: &str) -> proto::RegisterRuleResponse {
         let session = self.session.read().await;
         match session.register_logic(name, datalog) {
             Ok(()) => proto::RegisterRuleResponse {
@@ -234,10 +229,7 @@ impl AnamGrpcService {
     }
 
     /// Load an ONNX model.
-    pub async fn load_model(
-        &self,
-        req: &proto::LoadModelRequest,
-    ) -> proto::LoadModelResponse {
+    pub async fn load_model(&self, req: &proto::LoadModelRequest) -> proto::LoadModelResponse {
         let session = self.session.read().await;
         match session.load_onnx_model_with_metrics(
             &req.name,
@@ -289,9 +281,7 @@ pub async fn serve(addr: &str, config: SessionConfig) -> crate::core::error::Res
     let session = Session::with_config(config).await?;
     let service = Arc::new(AnamGrpcService::new(session));
 
-    let listener = TcpListener::bind(addr)
-        .await
-        .map_err(AnamError::Io)?;
+    let listener = TcpListener::bind(addr).await.map_err(AnamError::Io)?;
 
     info!(addr, "AnamDB server listening");
 
@@ -301,7 +291,7 @@ pub async fn serve(addr: &str, config: SessionConfig) -> crate::core::error::Res
 
         tokio::spawn(async move {
             info!(peer = %peer, "client connected");
-            
+
             // Peek at the first bytes to determine protocol.
             let mut buf = [0; 4];
             match stream.peek(&mut buf).await {
@@ -331,10 +321,13 @@ async fn handle_ws_connection(
     use futures::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
 
-    let ws_stream = tokio_tungstenite::accept_async(stream)
-        .await
-        .map_err(|e| AnamError::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("ws error: {e}"))))?;
-        
+    let ws_stream = tokio_tungstenite::accept_async(stream).await.map_err(|e| {
+        AnamError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("ws error: {e}"),
+        ))
+    })?;
+
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     while let Some(msg) = ws_receiver.next().await {
@@ -357,7 +350,8 @@ async fn handle_ws_connection(
             }
 
             // Parse JSON command and dispatch.
-            let response: serde_json::Value = match serde_json::from_str::<serde_json::Value>(line) {
+            let response: serde_json::Value = match serde_json::from_str::<serde_json::Value>(line)
+            {
                 Ok(cmd) => {
                     let method = cmd.get("method").and_then(|v| v.as_str()).unwrap_or("");
                     match method {
@@ -395,7 +389,9 @@ async fn handle_ws_connection(
                                 "rules": h.rule_count,
                             })
                         }
-                        _ => serde_json::json!({"ok": false, "error": format!("unknown method: {method}")}),
+                        _ => {
+                            serde_json::json!({"ok": false, "error": format!("unknown method: {method}")})
+                        }
                     }
                 }
                 Err(e) => serde_json::json!({"ok": false, "error": format!("invalid JSON: {e}")}),
@@ -474,7 +470,9 @@ async fn handle_connection(
                             "rules": h.rule_count,
                         })
                     }
-                    _ => serde_json::json!({"ok": false, "error": format!("unknown method: {method}")}),
+                    _ => {
+                        serde_json::json!({"ok": false, "error": format!("unknown method: {method}")})
+                    }
                 }
             }
             Err(e) => serde_json::json!({"ok": false, "error": format!("invalid JSON: {e}")}),

@@ -137,8 +137,7 @@ impl HubClient {
     /// Create a new hub client rooted at `hub_dir`.
     pub fn new(hub_dir: impl AsRef<Path>) -> Result<Self> {
         let hub_dir = hub_dir.as_ref().to_path_buf();
-        std::fs::create_dir_all(&hub_dir)
-            .map_err(AnamError::Io)?;
+        std::fs::create_dir_all(&hub_dir).map_err(AnamError::Io)?;
 
         let index_path = hub_dir.join("index.json");
         let index = if index_path.exists() {
@@ -207,7 +206,11 @@ impl HubClient {
         }
 
         // Find in available index (or create a placeholder for demo).
-        let manifest = self.index.available.get(&key).cloned()
+        let manifest = self
+            .index
+            .available
+            .get(&key)
+            .cloned()
             .unwrap_or_else(|| PackManifest {
                 name: name.clone(),
                 version: version.clone(),
@@ -441,7 +444,11 @@ mod tests {
         // Installing again should be a no-op.
         let r2 = hub.install("anamdb/financial-compliance@1.0.0").unwrap();
         assert!(!r2.installed, "double-install should be a no-op");
-        assert_eq!(hub.list_installed().len(), 1, "still 1 pack after duplicate install");
+        assert_eq!(
+            hub.list_installed().len(),
+            1,
+            "still 1 pack after duplicate install"
+        );
 
         println!("\n═══ Hub Install Test ═══");
         println!("  ✓ Install: {}", result.message);
@@ -500,4 +507,3 @@ mod tests {
         println!("  ✓ Installed packs survive restart");
     }
 }
-

@@ -30,7 +30,9 @@ pub struct Point3D {
 }
 
 impl Point3D {
-    pub fn new(x: f32, y: f32, z: f32) -> Self { Self { x, y, z } }
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
 
     /// Euclidean distance to another point.
     pub fn distance_to(&self, other: &Point3D) -> f32 {
@@ -122,10 +124,14 @@ impl PointCloud {
     }
 
     /// Number of points in the cloud.
-    pub fn len(&self) -> usize { self.points.len() }
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
 
     /// Whether the point cloud is empty.
-    pub fn is_empty(&self) -> bool { self.points.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
 }
 
 // ── Spatial Arrow Column Encoding ────────────────────────────────────
@@ -159,7 +165,8 @@ pub fn encode_point_cloud(pc: &PointCloud) -> Result<Vec<u8>> {
 
 /// Decode bytes into a PointCloud.
 pub fn decode_point_cloud(bytes: &[u8]) -> Result<PointCloud> {
-    bincode::deserialize(bytes).map_err(|e| AnamError::Serde(format!("point cloud decode error: {e}")))
+    bincode::deserialize(bytes)
+        .map_err(|e| AnamError::Serde(format!("point cloud decode error: {e}")))
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -329,14 +336,12 @@ mod tests {
 
     #[test]
     fn bbox_arrow_roundtrip() {
-        let bboxes = vec![
-            BoundingBox3D {
-                min: Point3D::new(0.0, 0.0, 0.0),
-                max: Point3D::new(1.0, 1.0, 1.0),
-                label: Some("pedestrian".into()),
-                confidence: 0.92,
-            },
-        ];
+        let bboxes = vec![BoundingBox3D {
+            min: Point3D::new(0.0, 0.0, 0.0),
+            max: Point3D::new(1.0, 1.0, 1.0),
+            label: Some("pedestrian".into()),
+            confidence: 0.92,
+        }];
 
         let array = encode_bboxes(&bboxes).unwrap();
         let binary_array = array.as_any().downcast_ref::<BinaryArray>().unwrap();
@@ -364,7 +369,10 @@ mod tests {
         let c = pc.centroid().unwrap();
         assert!((c.x - 1.0).abs() < 1e-5);
         assert!((c.y - 1.0).abs() < 1e-5);
-        println!("  ✓ PointCloud centroid: ({:.1}, {:.1}, {:.1})", c.x, c.y, c.z);
+        println!(
+            "  ✓ PointCloud centroid: ({:.1}, {:.1}, {:.1})",
+            c.x, c.y, c.z
+        );
     }
 
     #[test]
@@ -407,7 +415,10 @@ mod tests {
 
         println!("\n═══ Audio Graph Test ═══");
         println!("  ✓ Audio graph Arrow roundtrip");
-        println!("  ✓ Temporal window query: {} event in [0.0, 0.5)s", window.len());
+        println!(
+            "  ✓ Temporal window query: {} event in [0.0, 0.5)s",
+            window.len()
+        );
         println!("  ✓ Mean confidence: {:.3}", decoded[0].mean_confidence());
     }
 }

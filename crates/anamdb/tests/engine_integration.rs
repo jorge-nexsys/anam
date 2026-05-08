@@ -74,7 +74,10 @@ async fn provenance_column_attached() {
     println!("\n═══ Provenance Attachment Test ═══");
     println!("  Rows:       {}", batch.num_rows());
     println!("  Prov bytes: {} per row (avg)", prov_arr.value(0).len());
-    println!("  Tree:       {} chars", result.reasoning_tree.as_ref().unwrap().len());
+    println!(
+        "  Tree:       {} chars",
+        result.reasoning_tree.as_ref().unwrap().len()
+    );
     println!("  ✓ Provenance column attached to every query result");
 
     let _ = std::fs::remove_dir_all(&lance_path);
@@ -142,9 +145,11 @@ async fn streaming_provider_query() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn write_path_insert_delete() {
-    use std::sync::Arc;
-    use datafusion::arrow::array::{Float64Array, StringArray, BooleanArray, Int64Array, RecordBatch};
+    use datafusion::arrow::array::{
+        BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray,
+    };
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use std::sync::Arc;
 
     let csv_path = workspace_path("demo/data/transactions.csv");
     let lance_path = workspace_path("demo/data/test_write.lance");
@@ -164,7 +169,10 @@ async fn write_path_insert_delete() {
     let session = anamdb::Session::new().await.unwrap();
     session.register_table("txns", &lance_path).await.unwrap();
 
-    let before = session.sql("SELECT COUNT(*) AS cnt FROM txns").await.unwrap();
+    let before = session
+        .sql("SELECT COUNT(*) AS cnt FROM txns")
+        .await
+        .unwrap();
     let before_batch = &before.batches[0];
     let initial_count = before_batch
         .column_by_name("cnt")
@@ -217,8 +225,14 @@ async fn write_path_insert_delete() {
 
     println!("\n═══ Write Path Test ═══");
     println!("  Initial:  {initial_count} rows");
-    println!("  INSERT:   {} rows (version {})", insert_result.rows_affected, insert_result.new_version);
-    println!("  DELETE:   {} rows (version {})", delete_result.rows_affected, delete_result.new_version);
+    println!(
+        "  INSERT:   {} rows (version {})",
+        insert_result.rows_affected, insert_result.new_version
+    );
+    println!(
+        "  DELETE:   {} rows (version {})",
+        delete_result.rows_affected, delete_result.new_version
+    );
     println!("  ✓ INSERT and DELETE work via Lance APIs");
 
     let _ = std::fs::remove_dir_all(&lance_path);

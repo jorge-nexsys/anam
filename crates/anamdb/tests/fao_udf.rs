@@ -90,7 +90,9 @@ async fn fao_udf_inline_inference() {
 
     println!("\n═══ FAO UDF Integration Test: Inline Inference ═══");
     println!("  Model:  fraud_detector (ONNX)");
-    println!("  Query:  SELECT amount, fraud_detector(amount, fraud_prob, hour) AS score FROM txns");
+    println!(
+        "  Query:  SELECT amount, fraud_detector(amount, fraud_prob, hour) AS score FROM txns"
+    );
     println!("  Rows:   {}", batch.num_rows());
     for i in 0..batch.num_rows().min(5) {
         let amount = batch
@@ -100,7 +102,10 @@ async fn fao_udf_inline_inference() {
             .downcast_ref::<Float64Array>()
             .unwrap()
             .value(i);
-        println!("    row {i}: amount={amount:>10.2}, score={:.4}", scores.value(i));
+        println!(
+            "    row {i}: amount={amount:>10.2}, score={:.4}",
+            scores.value(i)
+        );
     }
     println!("  ✓ All scores in [0, 1] — ONNX inference inline in SQL works!");
 
@@ -126,10 +131,26 @@ async fn fao_udf_multiple_models() {
 
     // Register two models under different function names.
     session
-        .load_onnx_model_with_metrics("fraud_detector", "1.0.0", &model_path, "fraud_detector", 3, 5.0, 0.95)
+        .load_onnx_model_with_metrics(
+            "fraud_detector",
+            "1.0.0",
+            &model_path,
+            "fraud_detector",
+            3,
+            5.0,
+            0.95,
+        )
         .unwrap();
     session
-        .load_onnx_model_with_metrics("fraud_fast", "1.0.0", &fast_path, "fraud_fast", 3, 0.5, 0.75)
+        .load_onnx_model_with_metrics(
+            "fraud_fast",
+            "1.0.0",
+            &fast_path,
+            "fraud_fast",
+            3,
+            0.5,
+            0.75,
+        )
         .unwrap();
 
     // Ingest and register table.

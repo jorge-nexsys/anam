@@ -29,8 +29,8 @@ pub mod sdk;
 pub mod storage;
 
 // Server & client SDK.
-pub mod server;
 pub mod client;
+pub mod server;
 
 #[cfg(test)]
 mod bench_quick;

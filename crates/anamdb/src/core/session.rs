@@ -60,7 +60,7 @@ impl SessionConfig {
     pub fn load_from_toml(path: &str) -> std::result::Result<Self, String> {
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         let table: toml::Table = toml::from_str(&content).map_err(|e| e.to_string())?;
-        
+
         let mut config = SessionConfig::default();
         if let Some(engine) = table.get("engine").and_then(|v| v.as_table()) {
             if let Some(prov) = engine.get("provenance_mode").and_then(|v| v.as_str()) {
@@ -209,7 +209,8 @@ impl Session {
     #[instrument(skip(self))]
     pub async fn register_table(&self, name: &str, path: &str) -> Result<()> {
         info!(table = name, path, "registering Lance table (streaming)");
-        let provider = crate::storage::streaming_provider::LanceStreamingProvider::open(path).await?;
+        let provider =
+            crate::storage::streaming_provider::LanceStreamingProvider::open(path).await?;
         self.df_ctx
             .register_table(name, Arc::new(provider))
             .map_err(AnamError::DataFusion)?;
@@ -405,7 +406,8 @@ impl Session {
             0.95,
         )?;
         let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
-        self.model_registry.register_operator(Arc::clone(&operator))?;
+        self.model_registry
+            .register_operator(Arc::clone(&operator))?;
         self.register_fao_udf(Arc::clone(&operator));
 
         info!(model_id = %model_id, "ONNX model registered");
@@ -477,7 +479,8 @@ impl Session {
             accuracy,
         )?;
         let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
-        self.model_registry.register_operator(Arc::clone(&operator))?;
+        self.model_registry
+            .register_operator(Arc::clone(&operator))?;
         self.register_fao_udf(Arc::clone(&operator));
 
         info!(model_id = %model_id, "ONNX model variant registered");
@@ -651,8 +654,7 @@ impl Session {
                 .collect();
             columns.push(prov_array);
 
-            let new_batch = RecordBatch::try_new(new_schema, columns)
-                .map_err(AnamError::Arrow)?;
+            let new_batch = RecordBatch::try_new(new_schema, columns).map_err(AnamError::Arrow)?;
             result.push(new_batch);
         }
 
@@ -699,4 +701,3 @@ impl Session {
         }
     }
 }
-

@@ -44,10 +44,7 @@ async fn datalog_filter_blocks_low_risk_rows() {
 
     // Register a Datalog rule: only keep high-risk transactions.
     session
-        .register_logic(
-            "high_risk",
-            "high_risk(X) :- txns(X), fraud_prob > 0.80",
-        )
+        .register_logic("high_risk", "high_risk(X) :- txns(X), fraud_prob > 0.80")
         .unwrap();
 
     // Now query again — the rule should filter out low-fraud rows.
@@ -83,7 +80,10 @@ async fn datalog_filter_blocks_low_risk_rows() {
     println!("  Rule:     high_risk(X) :- txns(X), fraud_prob > 0.80");
     println!("  Before:   {total_rows} rows");
     println!("  After:    {filtered_rows} rows");
-    println!("  Dropped:  {} rows that violated the rule", total_rows - filtered_rows);
+    println!(
+        "  Dropped:  {} rows that violated the rule",
+        total_rows - filtered_rows
+    );
     println!("  ✓ All surviving rows satisfy fraud_prob > 0.80");
 
     let _ = std::fs::remove_dir_all(&lance_path);
