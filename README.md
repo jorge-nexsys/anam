@@ -65,9 +65,10 @@ anam> .hub install anamdb/financial-compliance@1.0.0
 anam> .ingest demo/data/transactions_large.csv demo/data/transactions_large.lance
 anam> .load demo/data/transactions_large.lance txns
 
--- 3. Run a SQL query that executes the neural model inline
+-- 3. Run a neurosymbolic query with Datalog-style constraints
 anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
-       FROM txns WHERE high_risk = true GROUP BY region ORDER BY avg_fraud DESC;
+       FROM txns WHERE fraud_prob > 0.90 AND amount > 10000
+       GROUP BY region ORDER BY avg_fraud DESC;
 
 -- 4. See exactly WHY the engine made those decisions
 anam> .explain
@@ -101,7 +102,8 @@ anam> .logic high_risk "fraud_prob > 0.90 AND amount > 10000"
 ✓ Registered rule 'high_risk'
 
 anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
-       FROM txns GROUP BY region ORDER BY avg_fraud DESC;
+       FROM txns WHERE fraud_prob > 0.90 AND amount > 10000
+       GROUP BY region ORDER BY avg_fraud DESC;
 +--------+-------+-----------+
 | region | count | avg_fraud |
 +--------+-------+-----------+
