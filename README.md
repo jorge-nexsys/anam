@@ -48,8 +48,23 @@ echo "OPENAI_API_KEY=sk-..." > .env
 # Run the full demo
 ./demo/run_demo.sh
 
-# Or explore interactively
-cargo run -- --gpu
+# Start the interactive REPL
+cargo run --bin anam
+
+# Or start the production-ready server
+cargo run --bin anam -- serve --port 8080
+```
+
+### Community Hub
+
+AnamDB includes a built-in package manager for models and logic:
+
+```bash
+# Search for community logic packs
+anam hub search fraud
+
+# Install the financial compliance pack
+anam hub install anamdb/financial-compliance@1.0.0
 ```
 
 ### Interactive Session
@@ -156,7 +171,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [x] **Alpha** — Kernel: Datalog engine, Lance storage, Semiring provenance, AI-Tables, Pareto optimizer, heterogeneous dispatch.
 - [x] **Beta** — Developer Experience: Logic Pack SDK, NL-to-Datalog compilation, syntactic self-repair, query explainer, interactive triage.
 - [x] **v1.0** — Distributed Reasoning Plane: 5-stage pipeline, BCNF policy catalog, multi-agent task routing, network-aware optimizer, global lineage.
-- [ ] **Beyond** — Ecosystem: Automated model distillation, spatial/temporal abstractions, community AI-Tables hub.
+- [x] **Engine Integration** — Native DataFusion UDFs for models, streaming table providers, persistent SQLite catalog.
+- [x] **Server & SDKs** — gRPC/JSON-over-TCP wire protocol, PyO3 Python SDK, native Rust SDK.
+- [x] **Live Demo** — Web-based Interactive Playground with WebSockets.
+- [x] **Ecosystem Hub** — Built-in `hub` package manager, spatial/temporal audio abstractions, model distillation engine.
+- [x] **Commercial Readiness** — API key auth middleware, Token-Bucket rate limiting, Stripe-ready usage metering, BSL 1.1 license.
 
 ---
 
@@ -167,6 +186,12 @@ $ cargo test
 
 test result: ok. 38 passed; 0 failed; 0 ignored
 ```
+
+## License
+
+AnamDB is licensed under the **Business Source License 1.1 (BSL)**. 
+
+It is completely free to use for development, evaluation, and startups with under $1M in annual revenue. The license automatically converts to **Apache 2.0** after 4 years from each release. See [LICENSE](LICENSE) for details.
 
 ---
 
