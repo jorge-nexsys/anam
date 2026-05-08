@@ -79,7 +79,7 @@ This roadmap outlines the path from our current single-node logic kernel to a fu
 ## Phase 7: Ecosystem & Customization
 *Focus: Broadening the ecosystem and lowering the barrier to entry for highly specialized domains.*
 
-- [ ] **Automated Model Distillation:** Allow users to automatically distill large, slow models (e.g., VideoMAEV2) into smaller, faster equivalents directly within the database to shift the Pareto frontier favorably.
-- [ ] **Expanded Semantic Abstractions:** Native support for 3D spatial representations and advanced temporal audio graphs within the unified relational layer.
-- [ ] **Community AI-Tables Hub:** A centralized package manager for developers to share pre-trained FAO models and Datalog constraints.
+- [x] **Automated Model Distillation:** Allow users to automatically distill large, slow models (e.g., VideoMAEV2) into smaller, faster equivalents directly within the database to shift the Pareto frontier favorably.
+- [x] **Expanded Semantic Abstractions:** Native support for 3D spatial representations and advanced temporal audio graphs within the unified relational layer.
+- [x] **Community AI-Tables Hub:** A centralized package manager for developers to share pre-trained FAO models and Datalog constraints.
 

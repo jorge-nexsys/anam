@@ -61,6 +61,7 @@ dashmap.workspace = true
 bytes.workspace = true
 rand.workspace = true
 tokio-tungstenite = "0.29.0"
+toml = "1.1.2"
 
 [dev-dependencies]
 criterion.workspace = true

@@ -230,7 +230,7 @@ mod tests {
     fn build_logic_pack() {
         let pack = LogicPackBuilder::new("financial_compliance", "1.0.0")
             .description("AML/KYC transaction rules")
-            .author("NSC")
+            .author("Jorge Martinez")
             .rule("high_risk", "fraud_prob > 0.90 AND amount > 10000")
             .rule(
                 "wire_alert",

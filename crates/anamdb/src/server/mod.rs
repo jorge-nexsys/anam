@@ -4,6 +4,11 @@
 //! and health checks over a JSON-over-TCP protocol. Designed for upgrade
 //! to full gRPC/tonic once tonic-build is integrated.
 
+pub mod auth;
+pub mod rate_limit;
+pub mod metering;
+
+
 use std::sync::Arc;
 
 use datafusion::arrow::ipc::writer::StreamWriter;
@@ -124,6 +129,9 @@ pub mod proto {
 /// The AnamDB service implementation.
 pub struct AnamGrpcService {
     session: Arc<RwLock<Session>>,
+    pub authenticator: Arc<dyn auth::Authenticator>,
+    pub rate_limiter: Arc<rate_limit::RateLimiter>,
+    pub metering: Arc<metering::MeteringSystem>,
 }
 
 impl AnamGrpcService {
@@ -131,12 +139,20 @@ impl AnamGrpcService {
     pub fn new(session: Session) -> Self {
         Self {
             session: Arc::new(RwLock::new(session)),
+            authenticator: Arc::new(auth::DummyAuthenticator),
+            rate_limiter: Arc::new(rate_limit::RateLimiter::new()),
+            metering: Arc::new(metering::MeteringSystem::new()),
         }
     }
 
     /// Create a new service with a shared session.
     pub fn with_shared_session(session: Arc<RwLock<Session>>) -> Self {
-        Self { session }
+        Self { 
+            session,
+            authenticator: Arc::new(auth::DummyAuthenticator),
+            rate_limiter: Arc::new(rate_limit::RateLimiter::new()),
+            metering: Arc::new(metering::MeteringSystem::new()),
+        }
     }
 
     /// Execute a SQL query and return results as Arrow IPC bytes.

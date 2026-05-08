@@ -55,6 +55,32 @@ impl Default for SessionConfig {
     }
 }
 
+impl SessionConfig {
+    /// Attempt to load configuration from a TOML file.
+    pub fn load_from_toml(path: &str) -> std::result::Result<Self, String> {
+        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let table: toml::Table = toml::from_str(&content).map_err(|e| e.to_string())?;
+        
+        let mut config = SessionConfig::default();
+        if let Some(engine) = table.get("engine").and_then(|v| v.as_table()) {
+            if let Some(prov) = engine.get("provenance_mode").and_then(|v| v.as_str()) {
+                config.provenance_mode = match prov.to_lowercase().as_str() {
+                    "boolean" | "bool" => ProvenanceMode::Boolean,
+                    "probability" | "prob" => ProvenanceMode::Probability,
+                    _ => ProvenanceMode::Polynomial,
+                };
+            }
+            if let Some(gpu) = engine.get("gpu").and_then(|v| v.as_bool()) {
+                config.enable_hardware_accel = gpu;
+            }
+            if let Some(threshold) = engine.get("anomaly_threshold").and_then(|v| v.as_float()) {
+                config.anomaly_threshold = threshold;
+            }
+        }
+        Ok(config)
+    }
+}
+
 /// The result of a neurosymbolic query.
 #[derive(Debug)]
 pub struct QueryResult {

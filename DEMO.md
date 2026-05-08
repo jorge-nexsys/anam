@@ -247,7 +247,7 @@ registering each rule and model, a developer loads one pack:
   "name": "financial_compliance",
   "version": "1.0.0",
   "description": "EU AML/KYC compliance rules for transaction monitoring",
-  "author": "NexSys Consulting",
+  "author": "Jorge Martinez",
   "rules": [
     { "name": "high_risk",  "datalog": "fraud_prob > 0.90 AND amount > 10000" },
     { "name": "wire_alert", "datalog": "merchant_type = 'wire_transfer' AND amount > 50000" },
@@ -275,7 +275,7 @@ println!("{summary}");
 ```
 Logic Pack: financial_compliance v1.0.0
   EU AML/KYC compliance rules for transaction monitoring
-  Author: NexSys Consulting
+  Author: Jorge Martinez
   3 rule(s), 2 model(s)
     • high_risk ← fraud_prob > 0.90 AND amount > 10000
     • wire_alert ← merchant_type = 'wire_transfer' AND amount > 50000

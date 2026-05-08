@@ -1,9 +1,7 @@
-//! Logic Pack SDK — modular, domain-specific neurosymbolic rulesets.
-//!
-//! A Logic Pack bundles Datalog rules, model references, and metadata into
-//! a reusable, distributable unit. Packs can be loaded into a [`Session`](crate::core::session::Session)
-//! to instantly configure domain-specific reasoning.
+//! Logic Pack SDK — modular, domain-specific neurosymbolic rulesets,
+//! and the AI-Tables Community Hub package manager.
 
+pub mod hub;
 pub mod logic_pack;
 pub mod python;
 

@@ -2,7 +2,7 @@
   "name": "financial_compliance",
   "version": "1.0.0",
   "description": "EU AML/KYC compliance rules for transaction monitoring. Flags high-risk transactions based on fraud probability, transaction amount, and merchant type.",
-  "author": "NexSys Consulting",
+  "author": "Jorge Martinez",
   "rules": [
     {
       "name": "high_risk",
