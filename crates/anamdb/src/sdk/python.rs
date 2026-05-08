@@ -30,7 +30,7 @@
 ///
 /// The implementation wraps `crate::client::AnamClient` using `pyo3-asyncio`
 /// for async bridging.
-
+///
 /// Marker struct for the Python SDK API surface.
 ///
 /// The actual PyO3 implementation requires the `pyo3` and `pyo3-asyncio`

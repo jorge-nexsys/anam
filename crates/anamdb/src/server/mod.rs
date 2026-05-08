@@ -128,8 +128,11 @@ pub mod proto {
 /// The AnamDB service implementation.
 pub struct AnamGrpcService {
     session: Arc<RwLock<Session>>,
+    /// Pluggable authentication backend.
     pub authenticator: Arc<dyn auth::Authenticator>,
+    /// Per-tenant token-bucket rate limiter.
     pub rate_limiter: Arc<rate_limit::RateLimiter>,
+    /// Usage metering coordinator for billing integration.
     pub metering: Arc<metering::MeteringSystem>,
 }
 
@@ -321,12 +324,9 @@ async fn handle_ws_connection(
     use futures::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
 
-    let ws_stream = tokio_tungstenite::accept_async(stream).await.map_err(|e| {
-        AnamError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("ws error: {e}"),
-        ))
-    })?;
+    let ws_stream = tokio_tungstenite::accept_async(stream)
+        .await
+        .map_err(|e| AnamError::Io(std::io::Error::other(format!("ws error: {e}"))))?;
 
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 

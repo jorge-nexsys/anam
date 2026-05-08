@@ -20,7 +20,6 @@ async fn server_client_roundtrip() {
     use anamdb::server::AnamGrpcService;
     use std::sync::Arc;
     use std::time::Duration;
-    use tokio::sync::RwLock;
 
     let csv_path = workspace_path("demo/data/transactions.csv");
     let lance_path = workspace_path("demo/data/test_server.lance");

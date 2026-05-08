@@ -24,12 +24,16 @@ use crate::core::error::{AnamError, Result};
 /// A 3D point in Euclidean space.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Point3D {
+    /// X coordinate.
     pub x: f32,
+    /// Y coordinate.
     pub y: f32,
+    /// Z coordinate.
     pub z: f32,
 }
 
 impl Point3D {
+    /// Create a new 3D point.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
     }

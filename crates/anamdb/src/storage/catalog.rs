@@ -52,7 +52,7 @@ pub struct ModelEntry {
 /// Uses a simple JSON file for storage to avoid adding a SQLite dependency.
 /// The catalog is loaded into memory on open, mutated in-place, and flushed
 /// to disk on every write operation for crash safety.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Catalog {
     /// Registered tables.
     pub tables: Vec<TableEntry>,
@@ -60,16 +60,6 @@ pub struct Catalog {
     pub rules: Vec<RuleEntry>,
     /// Registered models.
     pub models: Vec<ModelEntry>,
-}
-
-impl Default for Catalog {
-    fn default() -> Self {
-        Self {
-            tables: Vec::new(),
-            rules: Vec::new(),
-            models: Vec::new(),
-        }
-    }
 }
 
 /// Handle to a persistent catalog on disk.

@@ -31,8 +31,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
-use uuid::Uuid;
+use tracing::info;
 
 use crate::core::error::{AnamError, Result};
 
@@ -106,6 +105,7 @@ pub struct HubIndex {
 }
 
 impl HubIndex {
+    /// Create a new empty index with the given registry URL.
     pub fn new(registry_url: &str) -> Self {
         Self {
             registry_url: registry_url.to_string(),
@@ -217,7 +217,7 @@ impl HubClient {
                 description: format!("Community pack: {name}"),
                 author: "community".into(),
                 license: "Apache-2.0".into(),
-                tags: vec![name.split('/').last().unwrap_or("").to_string()],
+                tags: vec![name.split('/').next_back().unwrap_or("").to_string()],
                 models: vec![],
                 rules: vec![],
                 anamdb_version: ">=0.1.0".into(),
@@ -373,17 +373,24 @@ impl HubClient {
 /// Result of a `hub install` operation.
 #[derive(Debug, Clone)]
 pub struct InstallResult {
+    /// The pack reference string that was installed.
     pub pack_ref: String,
+    /// Whether the pack was newly installed (`false` if already present).
     pub installed: bool,
+    /// Human-readable status message.
     pub message: String,
 }
 
 /// Result of a `hub publish` operation.
 #[derive(Debug, Clone)]
 pub struct PublishResult {
+    /// Package name.
     pub name: String,
+    /// Package version.
     pub version: String,
+    /// Registry key (`name@version`).
     pub key: String,
+    /// Human-readable status message.
     pub message: String,
 }
 
