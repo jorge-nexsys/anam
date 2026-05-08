@@ -294,9 +294,9 @@ async fn handle_dot_command(
                 let hub_dir = dirs_next::data_dir()
                     .map(|d| d.join("anamdb").join("hub"))
                     .unwrap_or_else(|| ".anam_hub".into());
-                
+
                 let mut hub = anamdb::sdk::hub::HubClient::new(&hub_dir)?;
-                
+
                 match action {
                     "search" => {
                         let results = hub.search(target);
