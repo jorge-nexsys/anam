@@ -176,28 +176,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## Documentation
-
-| Document | Description |
-|:---|:---|
-| [DEMO.md](DEMO.md) | Full 17-step walkthrough with output examples |
-| [SPECS.md](SPECS.md) | System specifications (Alpha → Beta → v1.0) |
-
----
-
-## Roadmap
-
-- [x] **Alpha** — Kernel: Datalog engine, Lance storage, Semiring provenance, AI-Tables, Pareto optimizer, heterogeneous dispatch.
-- [x] **Beta** — Developer Experience: Logic Pack SDK, NL-to-Datalog compilation, syntactic self-repair, query explainer, interactive triage.
-- [x] **v1.0** — Distributed Reasoning Plane: 5-stage pipeline, BCNF policy catalog, multi-agent task routing, network-aware optimizer, global lineage.
-- [x] **Engine Integration** — Native DataFusion UDFs for models, streaming table providers, persistent SQLite catalog.
-- [x] **Server & SDKs** — gRPC/JSON-over-TCP wire protocol, PyO3 Python SDK, native Rust SDK.
-- [x] **Live Demo** — Web-based Interactive Playground with WebSockets.
-- [x] **Ecosystem Hub** — Built-in `hub` package manager, spatial/temporal audio abstractions, model distillation engine.
-- [x] **Commercial Readiness** — API key auth middleware, Token-Bucket rate limiting, Stripe-ready usage metering, BSL 1.1 license.
-
----
-
 ## Test Suite
 
 ```
