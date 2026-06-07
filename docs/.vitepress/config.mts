@@ -15,7 +15,23 @@ export default defineConfig({
         text: 'Introduction',
         items: [
           { text: 'What is AnamDB?', link: '/guide/what-is-anamdb' },
-          { text: 'Getting Started', link: '/guide/getting-started' }
+          { text: 'Getting Started', link: '/guide/getting-started' },
+          { text: 'Core Concepts', link: '/guide/core-concepts' }
+        ]
+      },
+      {
+        text: 'Developer Guide',
+        items: [
+          { text: 'CLI & REPL Reference', link: '/guide/cli-repl' },
+          { text: 'Rust SDK Integration', link: '/guide/rust-sdk' },
+          { text: 'Logic Packs & Hub', link: '/guide/logic-packs-hub' }
+        ]
+      },
+      {
+        text: 'Advanced Features',
+        items: [
+          { text: 'Explainability & HITL', link: '/guide/explainability-hitl' },
+          { text: 'Distributed Reasoning Plane', link: '/guide/distributed' }
         ]
       }
     ],
