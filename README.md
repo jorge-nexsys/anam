@@ -46,7 +46,7 @@ Unlike traditional vector databases that rely on semantic similarity or bolt-on 
 If you have Rust installed, you can install the AnamDB CLI and server in seconds:
 
 ```bash
-cargo install --git https://github.com/jam5991/anam anam-cli
+cargo install --git https://github.com/jorge-nexsys/anam anam-cli
 ```
 
 ### 2. The "3-Minute Wow"

@@ -5,7 +5,7 @@ To get started with AnamDB, you can either install the CLI locally or run the pr
 ## Installation
 
 ```bash
-cargo install --git https://github.com/jam5991/anam anam-cli
+cargo install --git https://github.com/jorge-nexsys/anam anam-cli
 ```
 
 ## Running the Server

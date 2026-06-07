@@ -36,7 +36,7 @@ export default defineConfig({
       }
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/jam5991/anam' }
+      { icon: 'github', link: 'https://github.com/jorge-nexsys/anam' }
     ],
     footer: {
       message: 'Released under the BSL-1.1 License.',

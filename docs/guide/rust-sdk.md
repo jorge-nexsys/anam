@@ -10,7 +10,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anamdb = { git = "https://github.com/jam5991/anam.git" }
+anamdb = { git = "https://github.com/jorge-nexsys/anam.git" }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
@@ -18,7 +18,7 @@ If you plan to use GPU acceleration, enable the `cuda` feature flag:
 
 ```toml
 [dependencies]
-anamdb = { git = "https://github.com/jam5991/anam.git", features = ["cuda"] }
+anamdb = { git = "https://github.com/jorge-nexsys/anam.git", features = ["cuda"] }
 ```
 
 ---

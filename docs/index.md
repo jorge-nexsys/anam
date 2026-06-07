@@ -11,7 +11,7 @@ hero:
       link: /guide/what-is-anamdb
     - theme: alt
       text: View on GitHub
-      link: https://github.com/jam5991/anam
+      link: https://github.com/jorge-nexsys/anam
 
 features:
   - title: Explainable AI
