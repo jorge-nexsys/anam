@@ -12,16 +12,7 @@ Modern AI applications suffer from a reliability crisis. Large Language Models (
 
 AnamDB bridges this gap using a **neurosymbolic execution plane**:
 
-```mermaid
-graph TD
-    RawData[Raw Data / Columnar Storage] --> |Arrow Batches| NeuralScan[Neural Perception: ONNX Models]
-    NeuralScan --> |Probabilistic Predictions| SymbolicLogic[Symbolic Constraints: Datalog Engine]
-    SymbolicLogic --> |Lineage Traces| Provenance[Semiring Provenance Tracker]
-    Provenance --> |Verified Outputs| QueryResult[Deterministic Results]
-    style QueryResult fill:#10B981,stroke:#047857,stroke-width:2px,color:#fff
-    style NeuralScan fill:#3B82F6,stroke:#1D4ED8,stroke-width:2px,color:#fff
-    style SymbolicLogic fill:#F59E0B,stroke:#D97706,stroke-width:2px,color:#fff
-```
+![Neurosymbolic Execution Pipeline: Raw Data flows through Neural Perception (ONNX), Symbolic Constraints (Datalog), and Provenance Tracking to produce Deterministic Results.](/images/neurosymbolic-pipeline.png)
 
 By compiling logic constraints into a differentiable Datalog engine, AnamDB filters the probabilistic outputs of AI models *before* they are returned. If a neural prediction contradicts a symbolic rule, the database kernel blocks the output or triggers a self-repair routing plan.
 

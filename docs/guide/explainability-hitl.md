@@ -90,21 +90,7 @@ The session prompts for one of four actions:
 
 In addition to semantic checks, AnamDB runs a background self-repair agent to handle system and runtime exceptions automatically:
 
-```mermaid
-sequenceDiagram
-    participant QueryEngine as Kernel Query Engine
-    participant Agent as Self-Repair Agent
-    participant Registry as Model Registry
-
-    QueryEngine->>Agent: Exception: operator exceeded deadline of 50ms
-    activate Agent
-    Agent->>Agent: Diagnose Root Cause (Timeout)
-    Agent->>Registry: Search for compatible alternative operators
-    Registry-->>Agent: Found 'fraud_fast' (0.5ms latency, 75% accuracy)
-    Agent->>QueryEngine: Apply SwapModel -> 'fraud_fast'
-    deactivate Agent
-    QueryEngine->>QueryEngine: Retry Query
-```
+![Self-Repair Loop: the Query Engine reports an exception to the Self-Repair Agent, which diagnoses the issue, queries the Model Registry for alternatives, and swaps to a faster model before retrying.](/images/self-repair-sequence.png)
 
 ### Self-Repair Matrix
 
