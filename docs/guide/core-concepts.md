@@ -46,9 +46,9 @@ AnamDB supports three provenance modes, configured depending on explainability a
 
 | Provenance Mode | Underlying Semiring | Output Detail | Use Case |
 |:---|:---|:---|:---|
-| **Boolean** | $(\mathbb{B}, \lor, \land, \text{false}, \text{true})$ | Binary (True/False) | High-speed boolean constraints |
-| **Probability** | $([0, 1], \max, \times, 0, 1)$ | Joint probability scores | Score aggregation, ranking |
-| **Polynomial** | $(\mathbb{N}[X], +, \times, 0, 1)$ | Symbolic expression formulas | Deep auditing, full-lineage debugging |
+| **Boolean** | (𝔹, ∨, ∧, false, true) | Binary (True/False) | High-speed boolean constraints |
+| **Probability** | ([0, 1], max, ×, 0, 1) | Joint probability scores | Score aggregation, ranking |
+| **Polynomial** | (ℕ[X], +, ×, 0, 1) | Symbolic expression formulas | Deep auditing, full-lineage debugging |
 
 > [!TIP]
 > **Polynomial mode** computes the exact lineage equations tracking every input record ID and model version that contributed to a result. It is ideal for compliance audits but has a higher computational footprint than Boolean or Probability modes.
@@ -61,17 +61,7 @@ When multiple neural models can perform a perception task, they often present di
 
 Rather than forcing the developer to hardcode model selection, AnamDB's query optimizer evaluates the **Pareto frontier**—the set of optimal query plans where no single dimension (Latency, Accuracy, Cost) can be improved without degrading another.
 
-```
-Accuracy (%)
-  ▲
-  │            ★ Deep Ensemble (99% Acc, 10ms, $1.00)
-  │           /
-  │          ★ Base Model (95% Acc, 5ms, $0.50)
-  │         /
-  │        ★ Distilled Model (75% Acc, 0.5ms, $0.10)
-  │
-  └──────────────────────────────────────────► Latency / Cost
-```
+![Pareto Frontier showing the tradeoff between Accuracy, Latency, and Cost across three model variants: Distilled, Base, and Deep Ensemble.](/images/pareto-frontier.png)
 
 At query execution time, developers specify constraints using standard syntax extensions:
 

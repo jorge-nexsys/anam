@@ -31,19 +31,7 @@ All rules and constraints are stored in a strict **Boyce-Codd Normal Form (BCNF)
 
 The task router maps execution stages and model operators to the most suitable physical hardware in the cluster:
 
-```
-                          ┌──────────────────────┐
-                          │     Task Router      │
-                          └──────────┬───────────┘
-                                     │
-         ┌───────────────────────────┼───────────────────────────┐
-         ▼                           ▼                           ▼
-  ┌─────────────┐             ┌─────────────┐             ┌─────────────┐
-  │  Edge Node  │             │  Core Node  │             │ Hybrid Node │
-  │ Accelerator │             │  High RAM   │             │ CPU + GPU   │
-  └─────────────┘             └─────────────┘             └─────────────┘
-  (OCR, Perception)          (Symbolic Joins)             (NLP + Rules)
-```
+![Multi-Agent Task Router distributing workloads across Edge, Core, and Hybrid compute nodes.](/images/task-router.png)
 
 Cluster workloads are distributed based on node capabilities:
 
@@ -59,12 +47,7 @@ Cluster workloads are distributed based on node capabilities:
 
 When executing across a network, the multi-objective Pareto optimizer incorporates **network overhead** (data serialization and transfer times) alongside compute latencies:
 
-```
-═══ Distributed Pareto Frontier ═══
-  ★ fraud_fast@edge       — compute: 0.5ms + network: 5.0ms = 5.5ms, accuracy: 75%
-  ★ fraud_detector@core   — compute: 5.0ms + network: 1.0ms = 6.0ms, accuracy: 95%
-  ★ fraud_ensemble@hybrid — compute: 10.0ms + network: 2.0ms = 12.0ms, accuracy: 99%
-```
+![Distributed Pareto Frontier showing compute and network latency breakdown for each deployment option.](/images/distributed-pareto.png)
 
 ### Progressive Query Rewrite
 If a remote edge node becomes congested at runtime or network latency spikes, the coordinator dynamically rewrites the physical query plan. It transparently shifts the perception operator to a base model on a core node to satisfy the query's latency constraint without returning failure.
@@ -75,25 +58,4 @@ If a remote edge node becomes congested at runtime or network latency spikes, th
 
 Global lineage traces results across physical cluster hops. Developers can inspect the exact pathway a tuple traveled, which models processed it, and how confidence scores fluctuated:
 
-```
-═══ Global Lineage: txn_001 ═══
-  Hops: 2 | Total Latency: 20.0ms
-
-  ┌─ Hop 1 (Perception Stage) ──────────────
-  │ Node:       edge-0
-  │ Operator:   ocr_extract
-  │ Model:      ocr_v2.1
-  │ Confidence: 0.9200
-  │ Duration:   15.00ms
-  │ Sources:    [img_001]
-  └──────────────────────────────────────────
-
-  ┌─ Hop 2 (Reasoning Stage) ───────────────
-  │ Node:       core-0
-  │ Operator:   fraud_detector
-  │ Model:      fraud_v1.0
-  │ Confidence: 0.9700
-  │ Duration:   5.00ms
-  │ Sources:    [txn_001_features]
-  └──────────────────────────────────────────
-```
+![Global Lineage trace showing two hops for txn_001 across edge and core nodes.](/images/global-lineage.png)
