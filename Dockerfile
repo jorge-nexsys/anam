@@ -6,7 +6,7 @@
 # GPU:    docker run --gpus all -p 8080:8080 anamdb serve --port 0.0.0.0:8080 --gpu
 
 # ── Stage 1: Builder ──────────────────────────────────────────────────
-FROM rust:1.86-bookworm AS builder
+FROM rust:latest AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
