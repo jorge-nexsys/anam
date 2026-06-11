@@ -8,25 +8,13 @@
 # ── Stage 1: Builder ──────────────────────────────────────────────────
 FROM rust:1.86-bookworm AS builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
-
-# Cache dependency compilation: copy manifests first, build a dummy project,
-# then copy real source. This avoids recompiling all deps on every code change.
-COPY Cargo.toml Cargo.lock ./
-COPY crates/anamdb/Cargo.toml crates/anamdb/Cargo.toml
-COPY crates/anam-cli/Cargo.toml crates/anam-cli/Cargo.toml
-
-# Create dummy source files so cargo can resolve the workspace.
-RUN mkdir -p crates/anamdb/src && echo "pub fn _dummy() {}" > crates/anamdb/src/lib.rs && \
-    mkdir -p crates/anam-cli/src && echo "fn main() {}" > crates/anam-cli/src/main.rs
-
-RUN cargo build --release --bin anam 2>/dev/null || true
-
-# Now copy the real source and build.
 COPY . .
-
-# Touch source files to invalidate the dummy build cache.
-RUN touch crates/anamdb/src/lib.rs crates/anam-cli/src/main.rs
 
 RUN cargo build --release --bin anam
 
@@ -41,6 +29,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/anam /usr/local/bin/anam
