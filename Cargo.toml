@@ -9,8 +9,14 @@ members = [
 version = "1.0.0"
 edition = "2024"
 authors = ["Jorge Martinez"]
-license = "BSL-1.1"
+license = "Apache-2.0"
 description = "The AI-Native, Differentiable Logic Kernel for Autonomous Agents"
+repository = "https://github.com/jorge-nexsys/anam"
+homepage = "https://jorge-nexsys.github.io/anam"
+documentation = "https://docs.rs/anamdb"
+readme = "README.md"
+keywords = ["database", "ai", "neurosymbolic", "datalog", "arrow"]
+categories = ["database-implementations", "science"]
 
 [workspace.dependencies]
 # Async runtime

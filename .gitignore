@@ -11,3 +11,14 @@ ROADMAP.md
 docs/node_modules/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/

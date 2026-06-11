@@ -76,6 +76,7 @@ dependencies = [
  "dotenvy",
  "rustyline",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]

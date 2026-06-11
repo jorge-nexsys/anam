@@ -56,11 +56,29 @@ enum Command {
         #[arg(long, default_value = "0.0.0.0:8080")]
         port: String,
     },
-    /// Initialize a new AnamDB data directory.
+    /// Initialize a new AnamDB project directory.
     Init {
-        /// Path to the data directory.
-        #[arg(default_value = "./anamdb_data")]
+        /// Path to the project directory.
+        #[arg(default_value = ".")]
         path: String,
+    },
+    /// Start the server using the project's anamdb.toml configuration.
+    Start {
+        /// Override the bind address.
+        #[arg(long)]
+        port: Option<String>,
+        /// Path to anamdb.toml config file.
+        #[arg(long, default_value = "anamdb.toml")]
+        config: String,
+        /// Enable GPU / NPU hardware acceleration.
+        #[arg(long, default_value_t = false)]
+        gpu: bool,
+    },
+    /// Check the status of a running AnamDB server.
+    Status {
+        /// Server address to check.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        addr: String,
     },
 }
 
@@ -101,13 +119,18 @@ async fn main() -> Result<()> {
         }
     };
 
-    // Build session config.
+    // Extract CLI fields before building config (needed by multiple branches).
+    let llm_api_key = cli.llm_api_key;
+    let llm_endpoint = cli.llm_endpoint;
+    let llm_model = cli.llm_model;
+
+    // Build session config (for Serve and REPL paths).
     let config = SessionConfig {
         provenance_mode,
         enable_hardware_accel: cli.gpu,
-        llm_api_key: cli.llm_api_key,
-        llm_endpoint: cli.llm_endpoint,
-        llm_model: Some(cli.llm_model),
+        llm_api_key: llm_api_key.clone(),
+        llm_endpoint: llm_endpoint.clone(),
+        llm_model: Some(llm_model.clone()),
         anomaly_threshold: 0.5,
     };
 
@@ -119,23 +142,27 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Init { path }) => {
-            println!("📁 Initializing AnamDB data directory: {path}");
+            println!("📁 Initializing AnamDB project: {path}");
             std::fs::create_dir_all(&path)?;
             std::fs::create_dir_all(format!("{path}/tables"))?;
             std::fs::create_dir_all(format!("{path}/models"))?;
+            std::fs::create_dir_all(format!("{path}/queries"))?;
+            std::fs::create_dir_all(format!("{path}/packs"))?;
 
             // Create default config file.
             let config_path = format!("{path}/anamdb.toml");
             if !std::path::Path::new(&config_path).exists() {
                 std::fs::write(
                     &config_path,
-                    r#"# AnamDB Configuration
+                    r#"# AnamDB Project Configuration
+# Docs: https://jorge-nexsys.github.io/anam
+
 [server]
 bind = "0.0.0.0:8080"
 log_level = "info"
 
 [engine]
-provenance_mode = "polynomial"
+provenance_mode = "polynomial"  # boolean | probability | polynomial
 gpu = false
 anomaly_threshold = 0.5
 
@@ -144,6 +171,93 @@ path = "catalog.json"
 "#,
                 )?;
                 println!("  ✓ Created {config_path}");
+            }
+
+            // Create .env.example.
+            let env_path = format!("{path}/.env.example");
+            if !std::path::Path::new(&env_path).exists() {
+                std::fs::write(
+                    &env_path,
+                    r#"# AnamDB Environment Variables
+# Copy this file to .env and fill in your values.
+
+# LLM API key for NL-to-Datalog compilation (optional)
+# ANAM_LLM_API_KEY=sk-...
+# ANAM_LLM_ENDPOINT=https://api.openai.com/v1
+# ANAM_LLM_MODEL=gpt-4o
+
+# Or use OpenAI directly:
+# OPENAI_API_KEY=sk-...
+"#,
+                )?;
+                println!("  ✓ Created {env_path}");
+            }
+
+            // Create example SQL query.
+            let query_path = format!("{path}/queries/example.sql");
+            if !std::path::Path::new(&query_path).exists() {
+                std::fs::write(
+                    &query_path,
+                    r#"-- Example AnamDB query
+-- Load a table first:  anam> .load /path/to/data.lance txns
+-- Then run this query: anam> .load queries/example.sql
+
+SELECT region,
+       COUNT(1) AS count,
+       ROUND(AVG(fraud_prob), 4) AS avg_fraud
+FROM txns
+WHERE fraud_prob > 0.90
+  AND amount > 10000
+GROUP BY region
+ORDER BY avg_fraud DESC;
+"#,
+                )?;
+                println!("  ✓ Created {query_path}");
+            }
+
+            // Create project README.
+            let readme_path = format!("{path}/README.md");
+            if !std::path::Path::new(&readme_path).exists() {
+                let project_name = std::path::Path::new(&path)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("my-anam-project");
+                std::fs::write(
+                    &readme_path,
+                    format!(
+                        r#"# {project_name}
+
+An [AnamDB](https://github.com/jorge-nexsys/anam) project.
+
+## Quick Start
+
+```bash
+# Start the server
+anam start
+
+# Or start the interactive REPL
+anam
+
+# Inside the REPL:
+anam> .load /path/to/data.lance my_table
+anam> SELECT * FROM my_table LIMIT 10;
+anam> .explain
+```
+
+## Project Structure
+
+| Path | Description |
+|:---|:---|
+| `anamdb.toml` | Project configuration |
+| `tables/` | Lance datasets |
+| `models/` | ONNX model files |
+| `queries/` | Saved SQL queries |
+| `packs/` | Logic Pack bundles |
+| `catalog.json` | Table/model/rule catalog |
+"#
+                    ),
+                )?;
+                println!("  ✓ Created {readme_path}");
             }
 
             // Create empty catalog.
@@ -155,7 +269,89 @@ path = "catalog.json"
 
             println!("  ✓ Created {path}/tables/");
             println!("  ✓ Created {path}/models/");
-            println!("\n  Done! Start the server with: anam serve --port 0.0.0.0:8080");
+            println!("  ✓ Created {path}/queries/");
+            println!("  ✓ Created {path}/packs/");
+            println!();
+            println!("  Done! Next steps:");
+            println!("    cd {path}");
+            println!("    cp .env.example .env    # configure LLM keys (optional)");
+            println!("    anam start              # start the server");
+            println!("    anam                    # or start the interactive REPL");
+            return Ok(());
+        }
+        Some(Command::Start { port, config, gpu }) => {
+            // Read config from anamdb.toml.
+            let config_path = std::path::Path::new(&config);
+            let (bind_addr, prov_mode, anomaly_thresh) = if config_path.exists() {
+                let toml_str = std::fs::read_to_string(config_path)?;
+                let toml_val: toml::Value = toml_str.parse()?;
+                let bind = toml_val
+                    .get("server")
+                    .and_then(|s| s.get("bind"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("0.0.0.0:8080")
+                    .to_string();
+                let prov = toml_val
+                    .get("engine")
+                    .and_then(|s| s.get("provenance_mode"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("polynomial")
+                    .to_string();
+                let thresh = toml_val
+                    .get("engine")
+                    .and_then(|s| s.get("anomaly_threshold"))
+                    .and_then(|v| v.as_float())
+                    .unwrap_or(0.5);
+                (bind, prov, thresh)
+            } else {
+                println!("⚠ No anamdb.toml found, using defaults. Run `anam init` first.");
+                ("0.0.0.0:8080".to_string(), "polynomial".to_string(), 0.5)
+            };
+
+            let bind = port.unwrap_or(bind_addr);
+            let prov_lower = prov_mode.to_lowercase();
+            let prov = match prov_lower.as_str() {
+                "boolean" | "bool" => ProvenanceMode::Boolean,
+                "probability" | "prob" => ProvenanceMode::Probability,
+                _ => ProvenanceMode::Polynomial,
+            };
+
+            let server_config = SessionConfig {
+                provenance_mode: prov,
+                enable_hardware_accel: gpu,
+                llm_api_key,
+                llm_endpoint,
+                llm_model: Some(llm_model),
+                anomaly_threshold: anomaly_thresh,
+            };
+
+            println!("🚀 Starting AnamDB server on {bind}...");
+            anamdb::server::serve(&bind, server_config).await?;
+            return Ok(());
+        }
+        Some(Command::Status { addr }) => {
+            println!("Connecting to AnamDB at {addr}...");
+            let mut client = anamdb::client::AnamClient::connect_to(&addr);
+            match client.connect().await {
+                Ok(()) => {
+                    match client.health().await {
+                        Ok(health) => {
+                            println!("✓ AnamDB is {}", health.status);
+                            println!("  Version:  {}", health.version);
+                            println!("  Tables:   {}", health.table_count);
+                            println!("  Models:   {}", health.model_count);
+                            println!("  Rules:    {}", health.rule_count);
+                        }
+                        Err(e) => {
+                            eprintln!("✗ Connected but health check failed: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("✗ Cannot connect to {addr}: {e}");
+                    eprintln!("  Is the server running? Start with: anam start");
+                }
+            }
             return Ok(());
         }
         None => {} // Fall through to REPL.

@@ -1,0 +1,30 @@
+# AnamDB — Docker Compose for local development
+#
+# Usage:
+#   docker compose up        # Start AnamDB server
+#   docker compose up -d     # Start in background
+#   docker compose down      # Stop and remove containers
+
+services:
+  anamdb:
+    build: .
+    container_name: anamdb
+    ports:
+      - "8080:8080"
+    volumes:
+      - anamdb_data:/data/anamdb
+    environment:
+      - RUST_LOG=info
+      - ANAM_LLM_API_KEY=${ANAM_LLM_API_KEY:-}
+      - ANAM_LLM_ENDPOINT=${ANAM_LLM_ENDPOINT:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo '{\"method\":\"health\"}' | nc -q 1 localhost 8080 | grep -q SERVING"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  anamdb_data:
+    driver: local

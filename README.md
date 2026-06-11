@@ -154,26 +154,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
  ┌──────────────────────────────────────────────────────────────────┐
  │                     AnamDB v1.0 Coordinator                      │
  │                                                                  │
- │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────────────┐  │
- │  │ BCNF Policy │ │ Distributed  │ │ Global Lineage           │  │
- │  │ Catalog     │ │ Optimizer    │ │ Tracer                   │  │
- │  └──────┬──────┘ └──────┬───────┘ └──────────┬───────────────┘  │
+ │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────────────┐   │
+ │  │ BCNF Policy │ │ Distributed  │ │ Global Lineage           │   │
+ │  │ Catalog     │ │ Optimizer    │ │ Tracer                   │   │
+ │  └──────┬──────┘ └──────┬───────┘ └──────────┬───────────────┘   │
  │         ▼               ▼                     ▼                  │
- │  ┌──────────────────────────────────────────────────────────┐    │
- │  │                    Task Router                            │    │
- │  │     Perception → Edge  |  Symbolic → Core  |  Mixed → Hybrid │
- │  └──────┬────────────────┬────────────────────┬─────────────┘    │
- └─────────┼────────────────┼────────────────────┼─────────────────┘
+ │  ┌─────────────────────────────────────────────────────────────┐ │
+ │  │                    Task Router                              │ │
+ │  │     Perception → Edge  |  Symbolic → Core  |  Mixed → Hybrid│ │
+ │  └──────┬────────────────┬────────────────────┬────────────────┘ │
+ └─────────┼────────────────┼────────────────────┼──────────────────┘
            │                │                    │
     ┌──────▼──────┐  ┌──────▼──────┐  ┌──────────▼──────┐
     │  Edge Node  │  │  Core Node  │  │  Hybrid Node    │
     │  NPU + 4GB  │  │  64GB RAM   │  │  GPU + 32GB     │
-    │             │  │             │  │                  │
+    │             │  │             │  │                 │
     │ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────────┐ │
     │ │ 5-Stage │ │  │ │ 5-Stage │ │  │ │ 5-Stage     │ │
     │ │Pipeline │ │  │ │Pipeline │ │  │ │ Pipeline    │ │
     │ └─────────┘ │  │ └─────────┘ │  │ └─────────────┘ │
-    └─────────────┘  └─────────────┘  └──────────────────┘
+    └─────────────┘  └─────────────┘  └─────────────────┘
 ```
 
 ---
@@ -188,9 +188,7 @@ test result: ok. 38 passed; 0 failed; 0 ignored
 
 ## License
 
-AnamDB is licensed under the **Business Source License 1.1 (BSL)**. 
-
-It is completely free to use for development, evaluation, and startups with under $1M in annual revenue. The license automatically converts to **Apache 2.0** after 4 years from each release. See [LICENSE](LICENSE) for details.
+AnamDB is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for details.
 
 ---
 

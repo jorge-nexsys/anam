@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "Interactive CLI / REPL for AnamDB."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [[bin]]
 name = "anam"
@@ -22,3 +26,4 @@ anyhow.workspace = true
 datafusion.workspace = true
 dirs-next = "2"
 dotenvy = { workspace = true }
+toml = "1"

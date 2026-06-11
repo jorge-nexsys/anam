@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- License changed from Business Source License 1.1 (BSL) to Apache License 2.0.
+- Added crates.io publish metadata (repository, homepage, keywords, categories).
+
 ### Added
-- Business Source License 1.1 (BSL) converting to Apache-2.0 after 4 years.
-- Commercial-ready stub infrastructure for server (authentication, rate limiting, metering).
+- Python SDK (`sdks/python/`) — async client for the AnamDB wire protocol.
+- Docker Compose and GHCR publish workflow.
+- CLI `start` and `status` subcommands for streamlined workflows.
 
 ## [0.1.0-alpha] - 2026-05-07
 
