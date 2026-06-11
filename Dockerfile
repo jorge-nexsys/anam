@@ -21,7 +21,7 @@ COPY . .
 RUN cargo build --release --bin anam
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 LABEL maintainer="Jorge Martinez"
 LABEL org.opencontainers.image.source="https://github.com/jorge-nexsys/anam"
