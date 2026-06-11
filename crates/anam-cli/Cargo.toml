@@ -15,7 +15,7 @@ name = "anam"
 path = "src/main.rs"
 
 [dependencies]
-anamdb = { path = "../anamdb" }
+anamdb = { path = "../anamdb", version = "1.0.0" }
 tokio.workspace = true
 clap.workspace = true
 rustyline.workspace = true

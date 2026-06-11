@@ -333,20 +333,18 @@ anam> .explain
             println!("Connecting to AnamDB at {addr}...");
             let mut client = anamdb::client::AnamClient::connect_to(&addr);
             match client.connect().await {
-                Ok(()) => {
-                    match client.health().await {
-                        Ok(health) => {
-                            println!("✓ AnamDB is {}", health.status);
-                            println!("  Version:  {}", health.version);
-                            println!("  Tables:   {}", health.table_count);
-                            println!("  Models:   {}", health.model_count);
-                            println!("  Rules:    {}", health.rule_count);
-                        }
-                        Err(e) => {
-                            eprintln!("✗ Connected but health check failed: {e}");
-                        }
+                Ok(()) => match client.health().await {
+                    Ok(health) => {
+                        println!("✓ AnamDB is {}", health.status);
+                        println!("  Version:  {}", health.version);
+                        println!("  Tables:   {}", health.table_count);
+                        println!("  Models:   {}", health.model_count);
+                        println!("  Rules:    {}", health.rule_count);
                     }
-                }
+                    Err(e) => {
+                        eprintln!("✗ Connected but health check failed: {e}");
+                    }
+                },
                 Err(e) => {
                     eprintln!("✗ Cannot connect to {addr}: {e}");
                     eprintln!("  Is the server running? Start with: anam start");
