@@ -165,8 +165,16 @@ impl Session {
         );
 
         let df_ctx = SessionContext::new();
-
         let logic_engine = Arc::new(RwLock::new(LogicEngine::new(config.provenance_mode)?));
+
+        // Register the Datalog filter pushdown optimizer rule.
+        let logic_rule = Arc::new(
+            crate::execution::logic_optimizer_rule::LogicOptimizerRule::new(
+                Arc::clone(&logic_engine),
+            ),
+        );
+        df_ctx.add_optimizer_rule(logic_rule);
+
         let model_registry = Arc::new(ModelRegistry::new());
 
         let nl_compiler = Arc::new(NlCompiler::new(
@@ -324,27 +332,26 @@ impl Session {
     /// Intercepts `PREDICT CLASS OF <col> FROM <table> WITH (model = '...')`
     /// and routes through the FAO operator pipeline.
     async fn execute_predict(&self, query: &str) -> Result<QueryResult> {
+        use crate::execution::predict_exec::{PredictExec, PredictType};
+
         let (target_col, source_table, model_name, pred_type) =
             ParetoOptimizer::parse_predict_query(query).ok_or_else(|| {
                 AnamError::QueryParse(format!("could not parse PREDICT query: {query}"))
             })?;
 
+        // Map the parser's prediction type to PredictExec's enum.
+        let predict_type = match pred_type {
+            crate::execution::optimizer::PredictionType::Classification => PredictType::Class,
+            crate::execution::optimizer::PredictionType::Regression => PredictType::Value,
+        };
+
         info!(
             target = %target_col,
             table = %source_table,
             model = %model_name,
-            pred_type = ?pred_type,
-            "executing PREDICT query"
+            pred_type = ?predict_type,
+            "executing PREDICT query via PredictExec"
         );
-
-        // Fetch base data from the source table.
-        let select_sql = format!("SELECT * FROM {source_table}");
-        let df = self
-            .df_ctx
-            .sql(&select_sql)
-            .await
-            .map_err(AnamError::DataFusion)?;
-        let batches = df.collect().await.map_err(AnamError::DataFusion)?;
 
         // Find the FAO operator for the requested model.
         let operator = self
@@ -357,21 +364,42 @@ impl Session {
                 ))
             })?;
 
-        // Execute the FAO operator against each batch.
-        let mut result_batches = Vec::with_capacity(batches.len());
-        for batch in &batches {
-            match operator.execute(batch.clone()).await {
-                Ok(result) => result_batches.push(result),
-                Err(e) => {
-                    tracing::warn!(
-                        model = %model_name,
-                        error = %e,
-                        "PREDICT FAO execution failed — falling back to raw batch"
-                    );
-                    result_batches.push(batch.clone());
-                }
-            }
-        }
+        // Build a DataFusion physical plan for the source table.
+        let select_sql = format!("SELECT * FROM {source_table}");
+        let df = self
+            .df_ctx
+            .sql(&select_sql)
+            .await
+            .map_err(AnamError::DataFusion)?;
+
+        // Get the physical plan from the DataFrame.
+        let logical_plan = df.logical_plan().clone();
+        let state = self.df_ctx.state();
+        let physical_plan = state
+            .create_physical_plan(&logical_plan)
+            .await
+            .map_err(AnamError::DataFusion)?;
+
+        // Wrap with PredictExec — this becomes a native DataFusion node.
+        let predict_node = Arc::new(PredictExec::new(
+            physical_plan,
+            operator,
+            format!("prediction_{}", target_col),
+            predict_type,
+        ));
+
+        // Execute through DataFusion's pipeline.
+        use datafusion_physical_plan::ExecutionPlan;
+        let task_ctx = state.task_ctx();
+        let stream = predict_node
+            .execute(0, task_ctx)
+            .map_err(AnamError::DataFusion)?;
+
+        use futures::TryStreamExt;
+        let result_batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(AnamError::DataFusion)?;
 
         let result_batches = self.attach_provenance(&result_batches)?;
         let anomalies = self.monitor.inspect_batches(&result_batches)?;
@@ -470,7 +498,7 @@ impl Session {
         // Register in AI-Tables catalog.
         self.model_registry.register_model(entry)?;
 
-        // Create and register the FAO operator.
+        // Create and register the FAO operator with device pool.
         let operator = OnnxFaoOperator::load(
             model_path,
             function_id,
@@ -480,7 +508,8 @@ impl Session {
             output_schema,
             1.0,
             0.95,
-        )?;
+        )?
+        .with_device_pool(Arc::clone(&self.device_pool));
         let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
         self.model_registry
             .register_operator(Arc::clone(&operator))?;
@@ -553,7 +582,8 @@ impl Session {
             output_schema,
             avg_latency_ms,
             accuracy,
-        )?;
+        )?
+        .with_device_pool(Arc::clone(&self.device_pool));
         let operator: Arc<dyn crate::model::fao::FaoOperator> = Arc::new(operator);
         self.model_registry
             .register_operator(Arc::clone(&operator))?;
@@ -646,13 +676,25 @@ impl Session {
     // ── Beta API: Self-Repair ────────────────────────────────────────────
 
     /// Trigger the syntactic self-repair agent for a failed operation.
-    pub fn self_repair(
+    ///
+    /// When the session has an `llm_api_key` configured, the agent uses
+    /// LLM-powered diagnosis and repair. Otherwise, it falls back to
+    /// pattern-matching heuristics.
+    pub async fn self_repair(
         &self,
         error_msg: &str,
         operator_name: &str,
         context: &str,
     ) -> Result<crate::hitl::self_repair::RepairReport> {
-        let mut agent = crate::hitl::self_repair::SelfRepairAgent::new();
+        let mut agent = if let Some(ref api_key) = self.config.llm_api_key {
+            crate::hitl::self_repair::SelfRepairAgent::with_llm(
+                api_key.clone(),
+                self.config.llm_endpoint.clone(),
+                self.config.llm_model.clone(),
+            )
+        } else {
+            crate::hitl::self_repair::SelfRepairAgent::new()
+        };
 
         // Provide available model names for swap recommendations.
         let model_names: Vec<String> = self
@@ -663,7 +705,7 @@ impl Session {
             .collect();
         agent.register_available_models(model_names);
 
-        agent.diagnose_and_repair(error_msg, operator_name, context)
+        agent.diagnose_and_repair(error_msg, operator_name, context).await
     }
 
     // ── Internal helpers ───────────────────────────────────────────────

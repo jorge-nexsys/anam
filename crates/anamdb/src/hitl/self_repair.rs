@@ -8,8 +8,10 @@
 //! 2. **Rewriter Agent** — Proposes a corrective action (schema adjustment,
 //!    model swap, input transform) and returns a `RepairAction`.
 //!
-//! This module uses an LLM to power both agents.
+//! This module integrates with an LLM (OpenAI-compatible) to power both agents,
+//! with the original pattern-matching logic retained as a fallback.
 
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument, warn};
 
@@ -137,18 +139,108 @@ impl RepairReport {
     }
 }
 
+// ── OpenAI-compatible API types ────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+struct ChatCompletionRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    temperature: f32,
+    max_tokens: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatChoice {
+    message: ChatMessage,
+}
+
+/// LLM-generated diagnosis in structured JSON.
+#[derive(Debug, Deserialize)]
+struct LlmDiagnosis {
+    root_cause: String,
+    severity: String,
+    confidence: f64,
+}
+
+/// LLM-generated repair action in structured JSON.
+#[derive(Debug, Deserialize)]
+struct LlmRepairAction {
+    action_type: String,
+    #[serde(default)]
+    replacement: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    change: Option<String>,
+    #[serde(default)]
+    adjustments: Option<String>,
+    #[serde(default)]
+    skip_count: Option<usize>,
+    #[serde(default)]
+    explanation: Option<String>,
+}
+
+// ── Self-Repair Agent ──────────────────────────────────────────────────
+
 /// The Self-Repair Agent — diagnoses and patches structural errors.
+///
+/// When an LLM API key is configured, both the Reviewer and Rewriter agents
+/// are powered by LLM reasoning. When the LLM is unavailable, the agent
+/// falls back to the built-in pattern-matching heuristics.
 #[derive(Debug)]
 pub struct SelfRepairAgent {
     /// Available model names for swap recommendations.
     available_models: Vec<String>,
+    /// Optional LLM API key.
+    api_key: Option<String>,
+    /// LLM endpoint URL.
+    endpoint: String,
+    /// LLM model name.
+    model: String,
+    /// HTTP client for LLM calls.
+    client: Client,
 }
 
+/// Default LLM endpoint.
+const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/chat/completions";
+/// Default LLM model.
+const DEFAULT_MODEL: &str = "gpt-4o";
+
 impl SelfRepairAgent {
-    /// Create a new self-repair agent.
+    /// Create a new self-repair agent without LLM integration (pattern-matching only).
     pub fn new() -> Self {
         Self {
             available_models: Vec::new(),
+            api_key: None,
+            endpoint: DEFAULT_ENDPOINT.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            client: Client::new(),
+        }
+    }
+
+    /// Create a new self-repair agent with LLM integration.
+    pub fn with_llm(
+        api_key: impl Into<String>,
+        endpoint: Option<String>,
+        model: Option<String>,
+    ) -> Self {
+        Self {
+            available_models: Vec::new(),
+            api_key: Some(api_key.into()),
+            endpoint: endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
+            model: model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+            client: Client::new(),
         }
     }
 
@@ -158,8 +250,12 @@ impl SelfRepairAgent {
     }
 
     /// Run the full two-agent loop: diagnose then repair.
+    ///
+    /// When an LLM API key is configured, uses LLM-powered reasoning for both
+    /// diagnosis and repair action generation. Falls back to pattern-matching
+    /// heuristics when the LLM is unavailable.
     #[instrument(skip(self))]
-    pub fn diagnose_and_repair(
+    pub async fn diagnose_and_repair(
         &self,
         error_msg: &str,
         operator_name: &str,
@@ -168,14 +264,63 @@ impl SelfRepairAgent {
         info!(
             error = error_msg,
             operator = operator_name,
+            llm_enabled = self.api_key.is_some(),
             "self-repair agent triggered"
         );
 
         // Stage 1: Reviewer — diagnose the error.
-        let diagnosis = self.review(error_msg, operator_name, context)?;
+        let diagnosis = if self.api_key.is_some() {
+            match self
+                .llm_review(error_msg, operator_name, context)
+                .await
+            {
+                Ok(d) => {
+                    info!(
+                        severity = %d.severity,
+                        confidence = d.confidence,
+                        "LLM diagnosis succeeded"
+                    );
+                    d
+                }
+                Err(e) => {
+                    warn!(error = %e, "LLM diagnosis failed — falling back to heuristic");
+                    self.heuristic_review(error_msg, operator_name, context)
+                }
+            }
+        } else {
+            self.heuristic_review(error_msg, operator_name, context)
+        };
 
         // Stage 2: Rewriter — propose a corrective action.
-        let action = self.rewrite(&diagnosis, operator_name)?;
+        let action = if self.api_key.is_some() {
+            match self
+                .llm_rewrite(&diagnosis, operator_name)
+                .await
+            {
+                Ok(a) => {
+                    info!(action = %a, "LLM repair action generated");
+                    a
+                }
+                Err(e) => {
+                    warn!(error = %e, "LLM rewrite failed — falling back to heuristic");
+                    self.heuristic_rewrite(&diagnosis, operator_name)
+                }
+            }
+        } else {
+            self.heuristic_rewrite(&diagnosis, operator_name)
+        };
+
+        // Stage 3: If we got RetryWithParams and context contains a Datalog rule,
+        // try Hamming-distance-1 repair candidates.
+        let action = if let RepairAction::RetryWithParams { .. } = &action {
+            if context.contains(":-") {
+                self.try_datalog_repair(context, action)
+            } else {
+                action
+            }
+        } else {
+            action
+        };
 
         let report = RepairReport {
             diagnosis,
@@ -187,11 +332,243 @@ impl SelfRepairAgent {
         Ok(report)
     }
 
-    /// Stage 1: Reviewer Agent — diagnose the error.
-    fn review(&self, error_msg: &str, operator_name: &str, context: &str) -> Result<Diagnosis> {
+    // ── LLM-Powered Agents ────────────────────────────────────────────
+
+    /// LLM Reviewer Agent: diagnose the error using structured prompting.
+    async fn llm_review(
+        &self,
+        error_msg: &str,
+        operator_name: &str,
+        context: &str,
+    ) -> Result<Diagnosis> {
+        let api_key = self.api_key.as_deref().ok_or_else(|| {
+            crate::core::error::AnamError::Internal("LLM API key not configured".into())
+        })?;
+
+        let models_str = if self.available_models.is_empty() {
+            "none".to_string()
+        } else {
+            self.available_models.join(", ")
+        };
+
+        let prompt = format!(
+            r#"You are a database self-repair agent for AnamDB, a neurosymbolic database engine.
+
+An FAO (Function-as-Operator) neural inference operator has encountered an error.
+
+Error details:
+- Error message: "{error_msg}"
+- Operator name: "{operator_name}"
+- Context: "{context}"
+- Available models: [{models_str}]
+
+Diagnose the root cause of this error.
+
+Respond with ONLY valid JSON (no markdown):
+{{"root_cause": "<detailed explanation>", "severity": "<Recoverable|Degraded|Fatal>", "confidence": <0.0-1.0>}}"#,
+        );
+
+        let request = ChatCompletionRequest {
+            model: self.model.clone(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: "You are a database error diagnosis expert. Respond only with valid JSON.".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: prompt,
+                },
+            ],
+            temperature: 0.0,
+            max_tokens: 512,
+        };
+
+        let response = self
+            .client
+            .post(&self.endpoint)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| crate::core::error::AnamError::Http(format!("LLM review request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(crate::core::error::AnamError::Http(format!(
+                "LLM API returned {status}: {body}"
+            )));
+        }
+
+        let completion: ChatCompletionResponse = response
+            .json()
+            .await
+            .map_err(|e| crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}")))?;
+
+        let content = completion
+            .choices
+            .first()
+            .map(|c| c.message.content.trim().to_string())
+            .ok_or_else(|| crate::core::error::AnamError::Internal("LLM returned no choices".into()))?;
+
+        let json_str = content
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim();
+
+        let llm_diag: LlmDiagnosis = serde_json::from_str(json_str).map_err(|e| {
+            crate::core::error::AnamError::Serde(format!("failed to parse LLM diagnosis: {e}"))
+        })?;
+
+        let severity = match llm_diag.severity.to_lowercase().as_str() {
+            "recoverable" => DiagnosisSeverity::Recoverable,
+            "degraded" => DiagnosisSeverity::Degraded,
+            _ => DiagnosisSeverity::Fatal,
+        };
+
+        Ok(Diagnosis {
+            original_error: error_msg.to_string(),
+            root_cause: llm_diag.root_cause,
+            confidence: llm_diag.confidence.clamp(0.0, 1.0),
+            severity,
+        })
+    }
+
+    /// LLM Rewriter Agent: propose a corrective action using structured prompting.
+    async fn llm_rewrite(
+        &self,
+        diagnosis: &Diagnosis,
+        operator_name: &str,
+    ) -> Result<RepairAction> {
+        let api_key = self.api_key.as_deref().ok_or_else(|| {
+            crate::core::error::AnamError::Internal("LLM API key not configured".into())
+        })?;
+
+        let models_str = if self.available_models.is_empty() {
+            "none".to_string()
+        } else {
+            self.available_models.join(", ")
+        };
+
+        let prompt = format!(
+            r#"You are a database self-repair agent proposing a corrective action.
+
+Diagnosis:
+- Root cause: "{}"
+- Severity: {}
+- Confidence: {:.0}%
+- Operator: "{operator_name}"
+- Available models: [{models_str}]
+
+Propose ONE corrective action. Available action types:
+- "SwapModel": Switch to a different model. Requires "replacement" and "reason".
+- "AdjustSchema": Fix input schema. Requires "change".
+- "RetryWithParams": Retry with adjustments. Requires "adjustments".
+- "SkipAndContinue": Skip failing rows. Requires "skip_count" and "reason".
+- "Escalate": Cannot auto-repair. Requires "explanation".
+
+Respond with ONLY valid JSON (no markdown):
+{{"action_type": "<type>", ...relevant fields...}}"#,
+            diagnosis.root_cause,
+            diagnosis.severity,
+            diagnosis.confidence * 100.0,
+        );
+
+        let request = ChatCompletionRequest {
+            model: self.model.clone(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: "You are a database repair agent. Respond only with valid JSON.".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: prompt,
+                },
+            ],
+            temperature: 0.0,
+            max_tokens: 512,
+        };
+
+        let response = self
+            .client
+            .post(&self.endpoint)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| crate::core::error::AnamError::Http(format!("LLM rewrite request failed: {e}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(crate::core::error::AnamError::Http(format!(
+                "LLM API returned {status}: {body}"
+            )));
+        }
+
+        let completion: ChatCompletionResponse = response
+            .json()
+            .await
+            .map_err(|e| crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}")))?;
+
+        let content = completion
+            .choices
+            .first()
+            .map(|c| c.message.content.trim().to_string())
+            .ok_or_else(|| crate::core::error::AnamError::Internal("LLM returned no choices".into()))?;
+
+        let json_str = content
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim();
+
+        let llm_action: LlmRepairAction = serde_json::from_str(json_str).map_err(|e| {
+            crate::core::error::AnamError::Serde(format!("failed to parse LLM repair action: {e}"))
+        })?;
+
+        // Convert the structured JSON into a RepairAction.
+        let action = match llm_action.action_type.to_lowercase().as_str() {
+            "swapmodel" | "swap_model" => RepairAction::SwapModel {
+                replacement: llm_action.replacement.unwrap_or_default(),
+                reason: llm_action.reason.unwrap_or_default(),
+            },
+            "adjustschema" | "adjust_schema" => RepairAction::AdjustSchema {
+                change: llm_action.change.unwrap_or_default(),
+            },
+            "retrywithparams" | "retry_with_params" => RepairAction::RetryWithParams {
+                adjustments: llm_action.adjustments.unwrap_or_default(),
+            },
+            "skipandcontinue" | "skip_and_continue" => RepairAction::SkipAndContinue {
+                skip_count: llm_action.skip_count.unwrap_or(0),
+                reason: llm_action.reason.unwrap_or_default(),
+            },
+            _ => RepairAction::Escalate {
+                explanation: llm_action
+                    .explanation
+                    .unwrap_or_else(|| "LLM recommended escalation".into()),
+            },
+        };
+
+        Ok(action)
+    }
+
+    // ── Heuristic Fallback Agents ─────────────────────────────────────
+
+    /// Heuristic Reviewer: pattern-match common structural errors.
+    fn heuristic_review(
+        &self,
+        error_msg: &str,
+        operator_name: &str,
+        context: &str,
+    ) -> Diagnosis {
         let error_lower = error_msg.to_lowercase();
 
-        // Pattern-match common structural errors.
         let (root_cause, severity, confidence) = if error_lower.contains("dimension")
             || error_lower.contains("shape")
         {
@@ -259,16 +636,16 @@ impl SelfRepairAgent {
             )
         };
 
-        Ok(Diagnosis {
+        Diagnosis {
             original_error: error_msg.to_string(),
             root_cause,
             confidence,
             severity,
-        })
+        }
     }
 
-    /// Stage 2: Rewriter Agent — propose a corrective action.
-    fn rewrite(&self, diagnosis: &Diagnosis, operator_name: &str) -> Result<RepairAction> {
+    /// Heuristic Rewriter: propose a corrective action based on severity.
+    fn heuristic_rewrite(&self, diagnosis: &Diagnosis, operator_name: &str) -> RepairAction {
         match diagnosis.severity {
             DiagnosisSeverity::Recoverable => {
                 // Try to find an alternative model.
@@ -277,40 +654,70 @@ impl SelfRepairAgent {
                     .iter()
                     .find(|m| m.as_str() != operator_name)
                 {
-                    Ok(RepairAction::SwapModel {
+                    RepairAction::SwapModel {
                         replacement: alt.clone(),
                         reason: format!(
                             "Swapping from '{}' to '{}' to bypass: {}",
                             operator_name, alt, diagnosis.root_cause
                         ),
-                    })
+                    }
                 } else {
-                    Ok(RepairAction::RetryWithParams {
+                    RepairAction::RetryWithParams {
                         adjustments: "Reduce batch size and retry.".into(),
-                    })
+                    }
                 }
             }
-            DiagnosisSeverity::Degraded => Ok(RepairAction::SkipAndContinue {
+            DiagnosisSeverity::Degraded => RepairAction::SkipAndContinue {
                 skip_count: 0,
                 reason: format!(
                     "Continuing in degraded mode. Unsupported rows will be skipped. \
                      Root cause: {}",
                     diagnosis.root_cause
                 ),
-            }),
+            },
             DiagnosisSeverity::Fatal => {
                 warn!(
                     error = %diagnosis.original_error,
                     "self-repair escalating to user"
                 );
-                Ok(RepairAction::Escalate {
+                RepairAction::Escalate {
                     explanation: format!(
                         "Cannot auto-repair: {}. Please review the operator configuration \
                          and input data manually.",
                         diagnosis.root_cause
                     ),
-                })
+                }
             }
+        }
+    }
+
+    // ── Datalog Repair Integration ────────────────────────────────────
+
+    /// Try Hamming-distance-1 Datalog repair candidates when the repair
+    /// action is `RetryWithParams` and the context contains a Datalog rule.
+    fn try_datalog_repair(&self, context: &str, fallback_action: RepairAction) -> RepairAction {
+        use crate::logic::datalog_repair;
+
+        let candidates = datalog_repair::generate_candidates(context);
+        if candidates.is_empty() {
+            return fallback_action;
+        }
+
+        info!(
+            candidates = candidates.len(),
+            "generated Hamming-distance-1 Datalog repair candidates"
+        );
+
+        // Return the first candidate as a RetryWithParams action.
+        if let Some(best) = candidates.first() {
+            RepairAction::RetryWithParams {
+                adjustments: format!(
+                    "Datalog repair: {}. Modified rule: {}",
+                    best.change_description, best.modified_source
+                ),
+            }
+        } else {
+            fallback_action
         }
     }
 
@@ -456,8 +863,8 @@ impl Default for SelfRepairAgent {
 mod tests {
     use super::*;
 
-    #[test]
-    fn diagnose_dimension_mismatch() {
+    #[tokio::test]
+    async fn diagnose_dimension_mismatch() {
         let agent = SelfRepairAgent::new();
         let report = agent
             .diagnose_and_repair(
@@ -465,14 +872,15 @@ mod tests {
                 "fraud_detector",
                 "input batch has 5 columns",
             )
+            .await
             .unwrap();
 
         assert_eq!(report.diagnosis.severity, DiagnosisSeverity::Recoverable);
         assert!(report.diagnosis.root_cause.contains("shape mismatch"));
     }
 
-    #[test]
-    fn diagnose_timeout_with_swap() {
+    #[tokio::test]
+    async fn diagnose_timeout_with_swap() {
         let mut agent = SelfRepairAgent::new();
         agent.register_available_models(vec!["fraud_detector".into(), "fraud_fast".into()]);
 
@@ -482,6 +890,7 @@ mod tests {
                 "fraud_detector",
                 "latency constraint violated",
             )
+            .await
             .unwrap();
 
         assert_eq!(report.diagnosis.severity, DiagnosisSeverity::Recoverable);
@@ -493,14 +902,58 @@ mod tests {
         }
     }
 
-    #[test]
-    fn diagnose_fatal_escalates() {
+    #[tokio::test]
+    async fn diagnose_fatal_escalates() {
         let agent = SelfRepairAgent::new();
         let report = agent
             .diagnose_and_repair("some unknown error xyz", "op1", "")
+            .await
             .unwrap();
 
         assert_eq!(report.diagnosis.severity, DiagnosisSeverity::Fatal);
         assert!(matches!(report.action, RepairAction::Escalate { .. }));
+    }
+
+    #[tokio::test]
+    async fn datalog_repair_integration() {
+        // Test that RetryWithParams + Datalog context triggers Hamming repair.
+        let agent = SelfRepairAgent::new();
+        let report = agent
+            .diagnose_and_repair(
+                "timeout exceeded",
+                "op1",
+                "high_risk(X) :- transactions(X), X.amount > 10000.",
+            )
+            .await
+            .unwrap();
+
+        // Should be Recoverable → RetryWithParams (since no swap models available).
+        assert_eq!(report.diagnosis.severity, DiagnosisSeverity::Recoverable);
+        match &report.action {
+            RepairAction::RetryWithParams { adjustments } => {
+                assert!(
+                    adjustments.contains("Datalog repair"),
+                    "should include Datalog repair candidates: got: {adjustments}"
+                );
+            }
+            other => panic!("expected RetryWithParams with Datalog repair, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_agent_uses_fallback_without_key() {
+        // Without an API key, should use heuristic fallback.
+        let agent = SelfRepairAgent::new();
+        let report = agent
+            .diagnose_and_repair(
+                "memory allocation failed: OOM",
+                "big_model",
+                "batch_size=100000",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(report.diagnosis.severity, DiagnosisSeverity::Degraded);
+        assert!(report.diagnosis.root_cause.contains("Out-of-memory"));
     }
 }

@@ -139,15 +139,6 @@ AnamDB's 5-stage pipeline processes every query through:
 | Storage | Lance (Arrow-backed columnar + vector) |
 | Wire protocol | JSON-over-TCP |
 
-## Status
-
-AnamDB is in active development. The core engine is functional and tested:
-
-```
-$ cargo test
-test result: ok. 93 passed; 0 failed; 0 ignored
-```
-
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.

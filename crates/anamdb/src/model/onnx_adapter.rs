@@ -1,7 +1,8 @@
 //! ONNX Runtime inference adapter.
 //!
 //! Wraps `ort` to implement [`FaoOperator`] for ONNX models, with support for
-//! CUDA and CoreML execution providers.
+//! CUDA and CoreML execution providers. Actively integrates with the
+//! [`DevicePool`] for heterogeneous hardware dispatch and load management.
 
 use std::sync::Arc;
 
@@ -10,12 +11,17 @@ use datafusion::arrow::array::{Array, ArrayRef, Float32Array, Float64Array, Reco
 use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef};
 use ort::session::Session as OrtSession;
 use parking_lot::Mutex;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use crate::core::error::{AnamError, Result};
-use crate::model::fao::FaoOperator;
+use crate::execution::dispatcher::{DevicePool, ExecutionJob};
+use crate::model::fao::{DeviceAffinity, FaoOperator};
 
 /// An [`FaoOperator`] backed by an ONNX Runtime session.
+///
+/// When a [`DevicePool`] is attached, inference execution will actively
+/// request a device slot before running and release it afterwards,
+/// enabling load-balanced multi-device inference.
 #[derive(Debug)]
 pub struct OnnxFaoOperator {
     function_id: String,
@@ -26,6 +32,10 @@ pub struct OnnxFaoOperator {
     output_schema: Arc<Schema>,
     avg_latency_ms: f64,
     accuracy: f64,
+    /// Device affinity preference for dispatch.
+    affinity: DeviceAffinity,
+    /// Optional device pool for hardware-aware dispatch.
+    device_pool: Option<Arc<DevicePool>>,
 }
 
 impl OnnxFaoOperator {
@@ -58,7 +68,26 @@ impl OnnxFaoOperator {
             output_schema,
             avg_latency_ms,
             accuracy,
+            affinity: DeviceAffinity::Any,
+            device_pool: None,
         })
+    }
+
+    /// Attach a device pool for hardware-aware inference dispatch.
+    ///
+    /// When set, every call to [`execute()`](FaoOperator::execute) will:
+    /// 1. Request a device slot from the pool (respecting device affinity).
+    /// 2. Run inference.
+    /// 3. Release the slot (even on error).
+    pub fn with_device_pool(mut self, pool: Arc<DevicePool>) -> Self {
+        self.device_pool = Some(pool);
+        self
+    }
+
+    /// Set the device affinity preference.
+    pub fn with_affinity(mut self, affinity: DeviceAffinity) -> Self {
+        self.affinity = affinity;
+        self
     }
 }
 
@@ -87,6 +116,69 @@ impl FaoOperator for OnnxFaoOperator {
     async fn execute(&self, input: RecordBatch) -> Result<RecordBatch> {
         let num_rows = input.num_rows();
 
+        // ── Device Pool dispatch ──────────────────────────────────────
+        let assignment = if let Some(pool) = &self.device_pool {
+            let job = ExecutionJob {
+                job_id: format!("{}@{}:{}", self.function_id, self.version, uuid::Uuid::new_v4()),
+                preferred_device: self.affinity.to_device_type(),
+                est_cpu_time_ms: self.avg_latency_ms * (num_rows as f64 / 1000.0).max(1.0),
+                est_memory_bytes: (num_rows * 4 * self.input_schema.fields().len()) as u64,
+            };
+
+            match pool.dispatch(job) {
+                Ok(a) => {
+                    info!(
+                        fao = %self.function_id,
+                        device = %a.slot.name,
+                        est_time_ms = a.est_time_ms,
+                        "dispatched inference to device slot"
+                    );
+                    Some(a)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "device pool dispatch failed — running on default device"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // ── Run inference ─────────────────────────────────────────────
+        let result = self.run_inference(input, num_rows);
+
+        // ── Release device slot ───────────────────────────────────────
+        if let (Some(pool), Some(a)) = (&self.device_pool, &assignment) {
+            pool.complete_job(a);
+            debug!(
+                fao = %self.function_id,
+                device = %a.slot.name,
+                "released device slot"
+            );
+        }
+
+        result
+    }
+
+    fn estimated_latency_ms(&self, batch_size: usize) -> f64 {
+        self.avg_latency_ms * (batch_size as f64 / 1000.0).max(1.0)
+    }
+
+    fn estimated_accuracy(&self) -> f64 {
+        self.accuracy
+    }
+
+    fn device_affinity(&self) -> Option<DeviceAffinity> {
+        Some(self.affinity)
+    }
+}
+
+impl OnnxFaoOperator {
+    /// Core inference logic, separated so device pool dispatch wraps it cleanly.
+    fn run_inference(&self, input: RecordBatch, num_rows: usize) -> Result<RecordBatch> {
         // Collect numeric columns into a flat f32 tensor.
         let mut flat_data: Vec<f32> = Vec::new();
         let mut num_features = 0usize;
@@ -143,13 +235,5 @@ impl FaoOperator for OnnxFaoOperator {
             .map_err(AnamError::Arrow)?;
 
         Ok(output_batch)
-    }
-
-    fn estimated_latency_ms(&self, batch_size: usize) -> f64 {
-        self.avg_latency_ms * (batch_size as f64 / 1000.0).max(1.0)
-    }
-
-    fn estimated_accuracy(&self) -> f64 {
-        self.accuracy
     }
 }

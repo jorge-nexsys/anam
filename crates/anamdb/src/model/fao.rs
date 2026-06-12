@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::core::error::Result;
+use crate::execution::dispatcher::DeviceType;
 
 /// Device affinity for hardware-dispatched inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +24,21 @@ pub enum DeviceAffinity {
     Gpu,
     /// Prefer NPU/accelerator execution.
     Npu,
+}
+
+impl DeviceAffinity {
+    /// Map this affinity to the dispatcher's [`DeviceType`].
+    ///
+    /// Returns `None` for `Any` (no preference), which lets the dispatcher
+    /// pick the slot with the lowest load.
+    pub fn to_device_type(self) -> Option<DeviceType> {
+        match self {
+            DeviceAffinity::Any => None,
+            DeviceAffinity::Cpu => Some(DeviceType::Cpu),
+            DeviceAffinity::Gpu => Some(DeviceType::CudaGpu), // default GPU backend
+            DeviceAffinity::Npu => Some(DeviceType::Npu),
+        }
+    }
 }
 
 /// A single inference function that can be wired into a DataFusion physical plan.

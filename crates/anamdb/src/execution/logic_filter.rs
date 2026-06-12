@@ -50,6 +50,19 @@ impl LogicFilterExec {
             properties,
         }
     }
+
+    /// Get the name of the Datalog rule being evaluated.
+    pub fn rule_name(&self) -> &str {
+        &self.rule_name
+    }
+
+    /// Get the Datalog source for the rule, if available.
+    ///
+    /// Used by the [`LogicOptimizerRule`] to extract pushable predicates.
+    pub fn rule_source(&self) -> Option<String> {
+        let engine = self.logic_engine.read();
+        engine.get_rule_body(&self.rule_name)
+    }
 }
 
 impl DisplayAs for LogicFilterExec {
