@@ -7,34 +7,68 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide/what-is-anamdb' },
-      { text: 'Hub', link: '/registry/index.json' }
+      { text: 'Engine Guide', link: '/guide/what-is-anamdb' },
+      { text: 'CLI Reference', link: '/cli/getting-started' }
     ],
-    sidebar: [
-      {
-        text: 'Introduction',
-        items: [
-          { text: 'What is AnamDB?', link: '/guide/what-is-anamdb' },
-          { text: 'Getting Started', link: '/guide/getting-started' },
-          { text: 'Core Concepts', link: '/guide/core-concepts' }
-        ]
-      },
-      {
-        text: 'Developer Guide',
-        items: [
-          { text: 'CLI & REPL Reference', link: '/guide/cli-repl' },
-          { text: 'Rust SDK Integration', link: '/guide/rust-sdk' },
-          { text: 'Logic Packs & Hub', link: '/guide/logic-packs-hub' }
-        ]
-      },
-      {
-        text: 'Advanced Features',
-        items: [
-          { text: 'Explainability & HITL', link: '/guide/explainability-hitl' },
-          { text: 'Distributed Reasoning Plane', link: '/guide/distributed' }
-        ]
-      }
-    ],
+    sidebar: {
+      '/guide/': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'What is AnamDB?', link: '/guide/what-is-anamdb' },
+            { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'SDK Integrations', link: '/guide/rust-sdk' }
+          ]
+        },
+        {
+          text: 'Concepts & Engine',
+          items: [
+            { text: 'Core Concepts', link: '/guide/core-concepts' },
+            { text: 'Datalog & Logic Packs', link: '/guide/logic-packs-hub' },
+            { text: 'Model Optimization & Pareto', link: '/guide/model-optimization' },
+            { text: 'Hybrid Storage & Vector', link: '/guide/storage-lance' },
+            { text: 'Explainability & HITL', link: '/guide/explainability-hitl' }
+          ]
+        },
+        {
+          text: 'Platform & Operations',
+          items: [
+            { text: 'Distributed Reasoning Plane', link: '/guide/distributed' },
+            { text: 'Security & Secrets', link: '/guide/security' },
+            { text: 'Limits & Benchmarks', link: '/guide/limits' }
+          ]
+        }
+      ],
+      '/cli/': [
+        {
+          text: 'Command Line Interface',
+          items: [
+            { text: 'Getting Started', link: '/cli/getting-started' },
+            { text: 'Interactive REPL', link: '/cli/repl' }
+          ]
+        },
+        {
+          text: 'CLI Commands',
+          items: [
+            { text: 'init', link: '/cli/commands/init' },
+            { text: 'start', link: '/cli/commands/start' },
+            { text: 'serve', link: '/cli/commands/serve' },
+            { text: 'status', link: '/cli/commands/status' }
+          ]
+        },
+        {
+          text: 'REPL Dot-Commands',
+          items: [
+            { text: '.load & .ingest', link: '/cli/repl/load-ingest' },
+            { text: '.logic & .rules', link: '/cli/repl/logic-rules' },
+            { text: '.model & .models', link: '/cli/repl/models' },
+            { text: '.explain', link: '/cli/repl/explain' },
+            { text: '.hub', link: '/cli/repl/hub' },
+            { text: '.devices', link: '/cli/repl/devices' }
+          ]
+        }
+      ]
+    },
     socialLinks: [
       { icon: 'github', link: 'https://github.com/AnamDB/anam-db' }
     ],
