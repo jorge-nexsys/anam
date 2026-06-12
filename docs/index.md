@@ -12,6 +12,9 @@ hero:
     - theme: alt
       text: View on GitHub
       link: https://github.com/AnamDB/anam-db
+  image:
+    src: /logo.png
+    alt: AnamDB Logo
 
 features:
   - title: Explainable AI
