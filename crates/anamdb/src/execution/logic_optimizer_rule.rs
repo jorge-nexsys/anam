@@ -153,11 +153,11 @@ fn extract_pushable_predicates(source: &str) -> Vec<Expr> {
         ] {
             if let Some((lhs, rhs)) = trimmed.split_once(op_str) {
                 let col_name = extract_column_name(lhs.trim());
-                if let Some(col_name) = col_name {
-                    if let Some(expr) = make_expr(&col_name, rhs.trim()) {
-                        predicates.push(expr);
-                        break;
-                    }
+                if let Some(col_name) = col_name
+                    && let Some(expr) = make_expr(&col_name, rhs.trim())
+                {
+                    predicates.push(expr);
+                    break;
                 }
             }
         }
@@ -182,10 +182,10 @@ fn parse_value_lit(s: &str) -> Option<Expr> {
     let s = s.trim();
 
     // Try float first.
-    if s.contains('.') {
-        if let Ok(f) = s.parse::<f64>() {
-            return Some(lit(f));
-        }
+    if s.contains('.')
+        && let Ok(f) = s.parse::<f64>()
+    {
+        return Some(lit(f));
     }
 
     // Try integer.

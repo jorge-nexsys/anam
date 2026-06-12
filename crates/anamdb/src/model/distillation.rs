@@ -108,6 +108,7 @@ pub struct DistillationResult {
 #[derive(Debug, Clone)]
 struct SoftLabels {
     /// Raw logit vectors from the teacher model (one per sample).
+    #[allow(dead_code)]
     logits: Vec<Vec<f64>>,
     /// Temperature-scaled probability vectors.
     probabilities: Vec<Vec<f64>>,
