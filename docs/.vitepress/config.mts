@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "AnamDB",
   description: "The AI-Native Neurosymbolic Database Engine",
-  base: "/anam/", // For GitHub Pages deployment
+  base: "/anam-db/", // GitHub Pages: anamdb.github.io/anam-db
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
@@ -36,11 +36,11 @@ export default defineConfig({
       }
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/jorge-nexsys/anam' }
+      { icon: 'github', link: 'https://github.com/AnamDB/anam-db' }
     ],
     footer: {
-      message: 'Released under the BSL-1.1 License.',
-      copyright: 'Copyright © 2026 Jorge Martinez'
+      message: 'Released under the Apache 2.0 License.',
+      copyright: 'Copyright © 2026 AnamDB'
     }
   }
 })
