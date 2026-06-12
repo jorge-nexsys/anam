@@ -22,10 +22,10 @@ use crate::model::fao::{DeviceAffinity, FaoOperator};
 /// We detect this dynamically from the input array length.
 fn infer_embedding_dim(batch: &RecordBatch) -> usize {
     // Check for explicit metadata first.
-    if let Some(dim_str) = batch.schema().metadata().get("embedding_dim") {
-        if let Ok(dim) = dim_str.parse::<usize>() {
-            return dim;
-        }
+    if let Some(dim_str) = batch.schema().metadata().get("embedding_dim")
+        && let Ok(dim) = dim_str.parse::<usize>()
+    {
+        return dim;
     }
 
     // Fallback: infer from array length / num_rows.
@@ -57,7 +57,7 @@ fn extract_embeddings(batch: &RecordBatch, col_name: &str, dim: usize) -> Result
         .ok_or_else(|| AnamError::Inference(format!("column '{col_name}' is not Float32")))?;
 
     // When embeddings are stored flat, the logical row count is arr.len() / dim.
-    let num_rows = if dim > 0 { arr.len() / dim } else { 0 };
+    let num_rows = arr.len().checked_div(dim).unwrap_or(0);
     let mut embeddings = Vec::with_capacity(num_rows);
 
     for row in 0..num_rows {

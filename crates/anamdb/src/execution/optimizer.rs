@@ -249,7 +249,7 @@ impl ParetoOptimizer {
         }?;
 
         // Extract target column: word after "OF".
-        let after_of = query.trim().split_whitespace().collect::<Vec<_>>();
+        let after_of = query.split_whitespace().collect::<Vec<_>>();
 
         // Format: PREDICT [CLASS|VALUE] OF <col> FROM <table> [WITH (model = '...')]
         let of_idx = after_of.iter().position(|w| w.eq_ignore_ascii_case("OF"))?;

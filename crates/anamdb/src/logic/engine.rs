@@ -356,10 +356,10 @@ impl LogicEngine {
             let mut joined = Vec::new();
             for left in &current_batches {
                 for right in &right_batches {
-                    if let Some(batch) = self.hash_join(left, right)? {
-                        if batch.num_rows() > 0 {
-                            joined.push(batch);
-                        }
+                    if let Some(batch) = self.hash_join(left, right)?
+                        && batch.num_rows() > 0
+                    {
+                        joined.push(batch);
                     }
                 }
             }

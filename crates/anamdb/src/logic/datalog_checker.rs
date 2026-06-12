@@ -147,21 +147,21 @@ impl DatalogChecker {
             // First pass: extract atoms and bound variables.
             for part in &parts {
                 let trimmed = part.trim();
-                if !self.is_condition(trimmed) {
-                    if let Some((rel, args)) = trimmed.split_once('(') {
-                        let rel = rel.trim().to_lowercase();
-                        referenced_relations.push(rel.clone());
+                if !self.is_condition(trimmed)
+                    && let Some((rel, args)) = trimmed.split_once('(')
+                {
+                    let rel = rel.trim().to_lowercase();
+                    referenced_relations.push(rel.clone());
 
-                        // Extract bound variables from atom arguments.
-                        let args = args.trim_end_matches(')');
-                        for arg in args.split(',') {
-                            let arg = arg.trim();
-                            if !arg.starts_with('\'')
-                                && !arg.starts_with('"')
-                                && arg.parse::<f64>().is_err()
-                            {
-                                bound_variables.insert(arg.to_uppercase());
-                            }
+                    // Extract bound variables from atom arguments.
+                    let args = args.trim_end_matches(')');
+                    for arg in args.split(',') {
+                        let arg = arg.trim();
+                        if !arg.starts_with('\'')
+                            && !arg.starts_with('"')
+                            && arg.parse::<f64>().is_err()
+                        {
+                            bound_variables.insert(arg.to_uppercase());
                         }
                     }
                 }
@@ -193,33 +193,33 @@ impl DatalogChecker {
                 let trimmed = part.trim();
                 if self.is_condition(trimmed) {
                     // Scope check: variable in condition must be bound.
-                    if let Some((lhs, _rhs)) = self.split_condition(trimmed) {
-                        if let Some((var, col)) = lhs.split_once('.') {
-                            let var_upper = var.trim().to_uppercase();
-                            if !bound_variables.contains(&var_upper) {
-                                errors.push(ValidationError {
-                                    message: format!(
-                                        "Variable '{var_upper}' used in condition but not bound in any body atom."
-                                    ),
-                                    offending_fragment: lhs.to_string(),
-                                    category: ValidationCategory::Scope,
-                                    suggestion: Some(format!(
-                                        "Add a body atom that binds '{var_upper}', e.g. some_relation({var_upper})."
-                                    )),
-                                });
-                            }
-
-                            // Type check: if we know the relation, check
-                            // the column type against the comparison value.
-                            let col_name = col.trim().to_lowercase();
-                            self.type_check_condition(
-                                &var_upper,
-                                &col_name,
-                                trimmed,
-                                &referenced_relations,
-                                &mut errors,
-                            );
+                    if let Some((lhs, _rhs)) = self.split_condition(trimmed)
+                        && let Some((var, col)) = lhs.split_once('.')
+                    {
+                        let var_upper = var.trim().to_uppercase();
+                        if !bound_variables.contains(&var_upper) {
+                            errors.push(ValidationError {
+                                message: format!(
+                                    "Variable '{var_upper}' used in condition but not bound in any body atom."
+                                ),
+                                offending_fragment: lhs.to_string(),
+                                category: ValidationCategory::Scope,
+                                suggestion: Some(format!(
+                                    "Add a body atom that binds '{var_upper}', e.g. some_relation({var_upper})."
+                                )),
+                            });
                         }
+
+                        // Type check: if we know the relation, check
+                        // the column type against the comparison value.
+                        let col_name = col.trim().to_lowercase();
+                        self.type_check_condition(
+                            &var_upper,
+                            &col_name,
+                            trimmed,
+                            &referenced_relations,
+                            &mut errors,
+                        );
                     }
                 }
             }
@@ -379,11 +379,11 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
 
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, val) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *val = j;
     }
 
     for i in 1..=m {

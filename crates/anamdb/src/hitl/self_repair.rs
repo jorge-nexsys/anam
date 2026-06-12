@@ -389,9 +389,9 @@ impl SelfRepairAgent {
                     for col_idx in 0..batch.num_columns() {
                         let col = batch.column(col_idx);
                         if let Some(nulls) = col.nulls() {
-                            for row in 0..num_rows {
+                            for (row, flag) in keep.iter_mut().enumerate() {
                                 if !nulls.is_valid(row) {
-                                    keep[row] = false;
+                                    *flag = false;
                                 }
                             }
                         }
