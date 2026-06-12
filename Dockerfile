@@ -23,8 +23,8 @@ RUN cargo build --release --bin anam
 # ── Stage 2: Runtime ──────────────────────────────────────────────────
 FROM debian:trixie-slim
 
-LABEL maintainer="Jorge Martinez"
-LABEL org.opencontainers.image.source="https://github.com/jorge-nexsys/anam"
+LABEL maintainer="AnamDB"
+LABEL org.opencontainers.image.source="https://github.com/AnamDB/anam-db"
 LABEL org.opencontainers.image.description="AnamDB — the AI-native neurosymbolic database engine"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 

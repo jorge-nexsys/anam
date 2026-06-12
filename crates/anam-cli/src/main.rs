@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
                 std::fs::write(
                     &config_path,
                     r#"# AnamDB Project Configuration
-# Docs: https://jorge-nexsys.github.io/anam
+# Docs: https://anamdb.github.io/anam-db
 
 [server]
 bind = "0.0.0.0:8080"
@@ -227,7 +227,7 @@ ORDER BY avg_fraud DESC;
                     format!(
                         r#"# {project_name}
 
-An [AnamDB](https://github.com/jorge-nexsys/anam) project.
+An [AnamDB](https://github.com/AnamDB/anam-db) project.
 
 ## Quick Start
 

@@ -32,10 +32,10 @@ arrow = ["pyarrow>=14.0"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.23"]
 
 [project.urls]
-Homepage = "https://jorge-nexsys.github.io/anam"
-Repository = "https://github.com/jorge-nexsys/anam"
-Documentation = "https://jorge-nexsys.github.io/anam"
-Issues = "https://github.com/jorge-nexsys/anam/issues"
+Homepage = "https://anamdb.github.io/anam-db"
+Repository = "https://github.com/AnamDB/anam-db"
+Documentation = "https://anamdb.github.io/anam-db"
+Issues = "https://github.com/AnamDB/anam-db/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/anamdb"]

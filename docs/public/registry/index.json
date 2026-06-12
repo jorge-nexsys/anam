@@ -62,5 +62,5 @@
       "anamdb_version": ">=1.0.0"
     }
   },
-  "registry_url": "https://jorge-nexsys.github.io/anam/registry"
+  "registry_url": "https://anamdb.github.io/anam-db/registry"
 }

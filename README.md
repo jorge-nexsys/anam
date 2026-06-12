@@ -3,7 +3,7 @@
 
 ![AnamDB Demo](demo.gif)
 
-📚 **[Official Documentation & Guide](https://jorge-nexsys.github.io/anam)**
+📚 **[Official Documentation & Guide](https://anamdb.github.io/anam-db)**
 
 **AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It natively integrates probabilistic neural perception with deterministic symbolic reasoning into a unified architecture — from a single-node kernel to a distributed multi-agent reasoning plane.
 
@@ -46,7 +46,7 @@ Unlike traditional vector databases that rely on semantic similarity or bolt-on 
 If you have Rust installed, you can install the AnamDB CLI and server in seconds:
 
 ```bash
-cargo install --git https://github.com/jorge-nexsys/anam anam-cli
+cargo install --git https://github.com/AnamDB/anam-db anam-cli
 ```
 
 ### 2. The "3-Minute Wow"

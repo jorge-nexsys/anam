@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: jorge-nexsys/anamdb
+  IMAGE_NAME: anamdb/anam-db
 
 jobs:
   build-and-push:

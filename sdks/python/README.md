@@ -1,6 +1,6 @@
 # AnamDB Python SDK
 
-Python client for [AnamDB](https://github.com/jorge-nexsys/anam) — the AI-native neurosymbolic database engine.
+Python client for [AnamDB](https://github.com/AnamDB/anam-db) — the AI-native neurosymbolic database engine.
 
 ## Installation
 
