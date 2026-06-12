@@ -3,7 +3,7 @@
 
 ![AnamDB Demo](demo.gif)
 
-📚 **[Official Documentation & Guide](https://anamdb.github.io/anam-db)**
+📚 **[Official Documentation & Guide](https://anamdb.github.io/anam-db/)**
 
 **AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It natively integrates probabilistic neural perception with deterministic symbolic reasoning into a unified architecture — from a single-node kernel to a distributed multi-agent reasoning plane.
 
