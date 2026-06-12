@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="./assets/transparent_full_logo.png?v=2" alt="AnamDB Logo" width="360">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/transparent_full_logo.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/full_logo_dark.png">
+  <img alt="AnamDB Logo" src="./assets/full_logo_dark.png" width="360">
+</picture>
 
 <b>AnamDB</b>: a neurosymbolic database engine for AI agents, fraud detection, and production reasoning. Built from scratch in Rust.
 <br/><br/>

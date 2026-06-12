@@ -5,7 +5,10 @@ export default defineConfig({
   description: "The AI-Native Neurosymbolic Database Engine",
   base: "/anam-db/", // GitHub Pages: anamdb.github.io/anam-db
   themeConfig: {
-    logo: '/logo.png',
+    logo: {
+      light: '/full_logo_dark.png',
+      dark: '/transparent_full_logo.png'
+    },
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Engine Guide', link: '/guide/what-is-anamdb' },

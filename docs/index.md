@@ -13,7 +13,8 @@ hero:
       text: View on GitHub
       link: https://github.com/AnamDB/anam-db
   image:
-    src: /logo.png
+    light: /full_logo_dark.png
+    dark: /transparent_full_logo.png
     alt: AnamDB Logo
 
 features:
