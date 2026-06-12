@@ -329,24 +329,24 @@ impl DatalogChecker {
                             });
                         }
                     }
-                    DataType::Utf8 | DataType::LargeUtf8 => {
-                        if !rhs.starts_with('\'') && !rhs.starts_with('"') {
-                            // Allow qualified variable references (X.col) or
-                            // single-char uppercase variables (X, Y, Z).
-                            let is_variable = rhs.contains('.')
-                                || (rhs.len() == 1 && rhs.chars().all(|c| c.is_uppercase()));
-                            if !is_variable {
-                                errors.push(ValidationError {
-                                    message: format!(
-                                        "Column '{col_name}' is string ({data_type}) but compared against unquoted value '{rhs}'."
-                                    ),
-                                    offending_fragment: condition.to_string(),
-                                    category: ValidationCategory::TypeMismatch,
-                                    suggestion: Some(format!(
-                                        "Quote the value: {col_name} = '{rhs}'"
-                                    )),
-                                });
-                            }
+                    DataType::Utf8 | DataType::LargeUtf8
+                        if !rhs.starts_with('\'') && !rhs.starts_with('"') =>
+                    {
+                        // Allow qualified variable references (X.col) or
+                        // single-char uppercase variables (X, Y, Z).
+                        let is_variable = rhs.contains('.')
+                            || (rhs.len() == 1 && rhs.chars().all(|c| c.is_uppercase()));
+                        if !is_variable {
+                            errors.push(ValidationError {
+                                message: format!(
+                                    "Column '{col_name}' is string ({data_type}) but compared against unquoted value '{rhs}'."
+                                ),
+                                offending_fragment: condition.to_string(),
+                                category: ValidationCategory::TypeMismatch,
+                                suggestion: Some(format!(
+                                    "Quote the value: {col_name} = '{rhs}'"
+                                )),
+                            });
                         }
                     }
                     _ => {} // Other types: skip for now.
