@@ -338,7 +338,10 @@ impl SelfRepairAgent {
         );
 
         match &report.action {
-            RepairAction::SwapModel { replacement, reason } => {
+            RepairAction::SwapModel {
+                replacement,
+                reason,
+            } => {
                 info!(replacement = %replacement, reason = %reason, "swapping to replacement model");
 
                 let operator = registry.get_latest_operator(replacement).map_err(|_| {
@@ -412,9 +415,8 @@ impl SelfRepairAgent {
                                 .map_err(crate::core::error::AnamError::Arrow)?;
                             columns.push(taken);
                         }
-                        let filtered =
-                            RecordBatch::try_new(batch.schema(), columns)
-                                .map_err(crate::core::error::AnamError::Arrow)?;
+                        let filtered = RecordBatch::try_new(batch.schema(), columns)
+                            .map_err(crate::core::error::AnamError::Arrow)?;
                         result_batches.push(filtered);
                     }
                 }

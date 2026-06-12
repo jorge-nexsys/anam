@@ -54,9 +54,7 @@ fn extract_embeddings(batch: &RecordBatch, col_name: &str, dim: usize) -> Result
     let arr = col
         .as_any()
         .downcast_ref::<Float32Array>()
-        .ok_or_else(|| {
-            AnamError::Inference(format!("column '{col_name}' is not Float32"))
-        })?;
+        .ok_or_else(|| AnamError::Inference(format!("column '{col_name}' is not Float32")))?;
 
     // When embeddings are stored flat, the logical row count is arr.len() / dim.
     let num_rows = if dim > 0 { arr.len() / dim } else { 0 };
@@ -187,11 +185,8 @@ impl FaoOperator for TransEScorer {
             .collect();
 
         let score_array = Float64Array::from(scores);
-        let result = RecordBatch::try_new(
-            self.output_schema.clone(),
-            vec![Arc::new(score_array)],
-        )
-        .map_err(AnamError::Arrow)?;
+        let result = RecordBatch::try_new(self.output_schema.clone(), vec![Arc::new(score_array)])
+            .map_err(AnamError::Arrow)?;
 
         Ok(result)
     }
@@ -312,11 +307,8 @@ impl FaoOperator for TransHScorer {
             .collect();
 
         let score_array = Float64Array::from(scores);
-        let result = RecordBatch::try_new(
-            self.output_schema.clone(),
-            vec![Arc::new(score_array)],
-        )
-        .map_err(AnamError::Arrow)?;
+        let result = RecordBatch::try_new(self.output_schema.clone(), vec![Arc::new(score_array)])
+            .map_err(AnamError::Arrow)?;
 
         Ok(result)
     }

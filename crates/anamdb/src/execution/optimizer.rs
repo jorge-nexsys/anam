@@ -237,9 +237,7 @@ impl ParetoOptimizer {
     /// - `PREDICT VALUE OF <column> FROM <table> WITH (model = '<name>')`
     ///
     /// Returns `(target_column, source_table, model_name, prediction_type)`.
-    pub fn parse_predict_query(
-        query: &str,
-    ) -> Option<(String, String, String, PredictionType)> {
+    pub fn parse_predict_query(query: &str) -> Option<(String, String, String, PredictionType)> {
         let upper = query.trim().to_uppercase();
 
         let pred_type = if upper.starts_with("PREDICT CLASS OF") {
@@ -251,14 +249,13 @@ impl ParetoOptimizer {
         }?;
 
         // Extract target column: word after "OF".
-        let after_of = query
-            .trim()
-            .split_whitespace()
-            .collect::<Vec<_>>();
+        let after_of = query.trim().split_whitespace().collect::<Vec<_>>();
 
         // Format: PREDICT [CLASS|VALUE] OF <col> FROM <table> [WITH (model = '...')]
         let of_idx = after_of.iter().position(|w| w.eq_ignore_ascii_case("OF"))?;
-        let from_idx = after_of.iter().position(|w| w.eq_ignore_ascii_case("FROM"))?;
+        let from_idx = after_of
+            .iter()
+            .position(|w| w.eq_ignore_ascii_case("FROM"))?;
 
         if of_idx + 1 >= from_idx || from_idx + 1 >= after_of.len() {
             return None;
@@ -277,8 +274,8 @@ impl ParetoOptimizer {
                 if let Some(eq_idx) = after_eq.find('=') {
                     let val = after_eq[eq_idx + 1..].trim();
                     let val = val.trim_start_matches('(').trim();
-                    let name = val
-                        .trim_matches(|c: char| c == '\'' || c == '"' || c == ')' || c == ' ');
+                    let name =
+                        val.trim_matches(|c: char| c == '\'' || c == '"' || c == ')' || c == ' ');
                     name.to_string()
                 } else {
                     "default".to_string()

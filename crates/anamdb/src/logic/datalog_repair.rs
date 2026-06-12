@@ -59,10 +59,7 @@ impl RepairReport {
              Repaired: {}\n\
              Change:   {}\n\
              Results:  {} rows",
-            self.original_source,
-            self.repaired_source,
-            self.change_description,
-            self.result_count,
+            self.original_source, self.repaired_source, self.change_description, self.result_count,
         )
     }
 }
@@ -102,10 +99,7 @@ pub fn generate_candidates(source: &str) -> Vec<RepairCandidate> {
                     let new_body = rebuild_body(&parts, idx, &new_part);
                     candidates.push(RepairCandidate {
                         modified_source: format!("{} :- {new_body}.", head.trim()),
-                        change_description: format!(
-                            "Condition '{}': {desc}",
-                            trimmed
-                        ),
+                        change_description: format!("Condition '{}': {desc}", trimmed),
                         mutation: MutationType::OperatorSwap,
                     });
                 }
@@ -137,10 +131,7 @@ pub fn generate_candidates(source: &str) -> Vec<RepairCandidate> {
                 let new_body = remaining.join(", ");
                 candidates.push(RepairCandidate {
                     modified_source: format!("{} :- {new_body}.", head.trim()),
-                    change_description: format!(
-                        "Removed condition '{}'",
-                        cond
-                    ),
+                    change_description: format!("Removed condition '{}'", cond),
                     mutation: MutationType::ConditionRelax,
                 });
             }
@@ -283,13 +274,7 @@ fn rebuild_body(parts: &[&str], replace_idx: usize, new_part: &str) -> String {
     parts
         .iter()
         .enumerate()
-        .map(|(i, p)| {
-            if i == replace_idx {
-                new_part
-            } else {
-                p
-            }
-        })
+        .map(|(i, p)| if i == replace_idx { new_part } else { p })
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -315,9 +300,7 @@ fn generate_threshold_variants(
                 let new_body = rebuild_body(parts, idx, &new_part);
                 candidates.push(RepairCandidate {
                     modified_source: format!("{head} :- {new_body}."),
-                    change_description: format!(
-                        "Scaled threshold: {value} → {scaled_down} (÷10)"
-                    ),
+                    change_description: format!("Scaled threshold: {value} → {scaled_down} (÷10)"),
                     mutation: MutationType::ThresholdScale,
                 });
 
@@ -327,9 +310,7 @@ fn generate_threshold_variants(
                 let new_body = rebuild_body(parts, idx, &new_part);
                 candidates.push(RepairCandidate {
                     modified_source: format!("{head} :- {new_body}."),
-                    change_description: format!(
-                        "Scaled threshold: {value} → {scaled_up} (×10)"
-                    ),
+                    change_description: format!("Scaled threshold: {value} → {scaled_up} (×10)"),
                     mutation: MutationType::ThresholdScale,
                 });
 
@@ -383,8 +364,7 @@ mod tests {
 
     #[test]
     fn generate_condition_relaxation() {
-        let source =
-            "strict(X) :- transactions(X), X.fraud_prob > 0.99, X.amount > 100000, X.region = 'EU'.";
+        let source = "strict(X) :- transactions(X), X.fraud_prob > 0.99, X.amount > 100000, X.region = 'EU'.";
         let candidates = generate_candidates(source);
 
         let relax_candidates: Vec<_> = candidates

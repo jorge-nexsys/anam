@@ -143,7 +143,8 @@ Examples:
 
         // Schema-aware validation via PQC (if checker is configured).
         let datalog = if let Some(checker) = &self.checker {
-            self.validate_and_retry(checker, &datalog, nl, table, api_key).await?
+            self.validate_and_retry(checker, &datalog, nl, table, api_key)
+                .await?
         } else {
             datalog
         };

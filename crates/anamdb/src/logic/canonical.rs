@@ -45,10 +45,8 @@ fn normalize_head(head: &str) -> String {
     if let Some((rel, args)) = head.split_once('(') {
         let rel = rel.trim().to_lowercase();
         let args = args.trim_end_matches(')');
-        let normalized_args: Vec<String> = args
-            .split(',')
-            .map(|a| normalize_term(a.trim()))
-            .collect();
+        let normalized_args: Vec<String> =
+            args.split(',').map(|a| normalize_term(a.trim())).collect();
         format!("{rel}({})", normalized_args.join(", "))
     } else {
         head.to_lowercase()
@@ -144,10 +142,8 @@ fn normalize_atom(atom: &str) -> String {
     if let Some((rel, args)) = atom.split_once('(') {
         let rel = rel.trim().to_lowercase();
         let args = args.trim_end_matches(')');
-        let normalized_args: Vec<String> = args
-            .split(',')
-            .map(|a| normalize_term(a.trim()))
-            .collect();
+        let normalized_args: Vec<String> =
+            args.split(',').map(|a| normalize_term(a.trim())).collect();
         format!("{rel}({})", normalized_args.join(", "))
     } else {
         atom.to_lowercase()
@@ -243,7 +239,10 @@ mod tests {
     fn normalize_plain_constraint() {
         let raw = "fraud_prob > 0.90 AND amount > 10000 AND region = 'EU'";
         let result = normalize(raw);
-        assert_eq!(result, "AMOUNT > 10000 AND FRAUD_PROB > 0.90 AND REGION = 'EU'");
+        assert_eq!(
+            result,
+            "AMOUNT > 10000 AND FRAUD_PROB > 0.90 AND REGION = 'EU'"
+        );
     }
 
     #[test]
@@ -272,8 +271,7 @@ mod tests {
 
     #[test]
     fn normalize_recursive_rule() {
-        let raw =
-            "inferred_interaction(A, X) :- InteractsWith(A, B), inferred_interaction(B, X).";
+        let raw = "inferred_interaction(A, X) :- InteractsWith(A, B), inferred_interaction(B, X).";
         let result = normalize(raw);
         assert_eq!(
             result,

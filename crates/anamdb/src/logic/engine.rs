@@ -82,7 +82,10 @@ impl LogicEngine {
 
         let is_recursive = Self::detect_recursive(name, datalog_source);
         if is_recursive {
-            info!(name, "detected recursive rule — will use fixed-point evaluation");
+            info!(
+                name,
+                "detected recursive rule — will use fixed-point evaluation"
+            );
         }
 
         self.rules.insert(
@@ -367,11 +370,7 @@ impl LogicEngine {
     }
 
     /// Hash-join two batches on shared column names.
-    fn hash_join(
-        &self,
-        left: &RecordBatch,
-        right: &RecordBatch,
-    ) -> Result<Option<RecordBatch>> {
+    fn hash_join(&self, left: &RecordBatch, right: &RecordBatch) -> Result<Option<RecordBatch>> {
         let left_schema = left.schema();
         let right_schema = right.schema();
 
@@ -471,18 +470,16 @@ impl LogicEngine {
             if let Some((idx, _)) = batch.schema().column_with_name(col_name) {
                 let col = batch.column(idx);
                 let val = match col.data_type() {
-                    DataType::Utf8 => {
-                        col.as_any()
-                            .downcast_ref::<StringArray>()
-                            .map(|a| a.value(row).to_string())
-                            .unwrap_or_default()
-                    }
-                    DataType::Float64 => {
-                        col.as_any()
-                            .downcast_ref::<Float64Array>()
-                            .map(|a| format!("{}", a.value(row)))
-                            .unwrap_or_default()
-                    }
+                    DataType::Utf8 => col
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .map(|a| a.value(row).to_string())
+                        .unwrap_or_default(),
+                    DataType::Float64 => col
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .map(|a| format!("{}", a.value(row)))
+                        .unwrap_or_default(),
                     _ => format!("row_{row}"),
                 };
                 key.push(val);
@@ -820,6 +817,9 @@ mod tests {
             .unwrap();
 
         let cloned = engine.clone_for_repair().unwrap();
-        assert!(cloned.list_rules().is_empty(), "Cloned engine should have no rules");
+        assert!(
+            cloned.list_rules().is_empty(),
+            "Cloned engine should have no rules"
+        );
     }
 }

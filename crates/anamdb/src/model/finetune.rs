@@ -295,9 +295,7 @@ impl FinetuneEngine {
 
         info!(
             total = total_layers,
-            frozen,
-            trainable,
-            "layer structure prepared"
+            frozen, trainable, "layer structure prepared"
         );
 
         // 3. Extract the trainable head layers.
@@ -355,11 +353,7 @@ impl FinetuneEngine {
             run_id,
             teacher_model_id: config.teacher_model_id.clone(),
             finetuned_model_id: finetuned_id,
-            artifact_path: if accepted {
-                Some(output_path)
-            } else {
-                None
-            },
+            artifact_path: if accepted { Some(output_path) } else { None },
             frozen_layers: frozen,
             total_layers,
             trainable_layers: trainable,
@@ -460,7 +454,10 @@ mod tests {
     fn accuracy_improvement_estimate() {
         let low = estimate_accuracy_improvement(1, 0.0001);
         let high = estimate_accuracy_improvement(50, 0.01);
-        assert!(high > low, "More epochs + higher LR should give more improvement");
+        assert!(
+            high > low,
+            "More epochs + higher LR should give more improvement"
+        );
         assert!(high <= 0.15, "Should be capped at 15%");
     }
 }

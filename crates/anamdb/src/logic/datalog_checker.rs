@@ -9,8 +9,6 @@ use std::collections::{HashMap, HashSet};
 use datafusion::arrow::datatypes::{DataType, Schema};
 use tracing::{debug, info};
 
-
-
 /// A single validation error found by the PQC.
 #[derive(Debug, Clone)]
 pub struct ValidationError {
@@ -185,8 +183,7 @@ impl DatalogChecker {
                         message: format!("Relation '{rel}' not found in schema catalog."),
                         offending_fragment: rel.clone(),
                         category: ValidationCategory::Vocabulary,
-                        suggestion: similar
-                            .map(|s| format!("Did you mean '{s}'?")),
+                        suggestion: similar.map(|s| format!("Did you mean '{s}'?")),
                     });
                 }
             }
@@ -257,9 +254,7 @@ impl DatalogChecker {
         let operators = [">=", "<=", "!=", ">", "<"];
         // An atom has `relation(...)` structure.
         // A condition has a comparison operator.
-        if part.contains('(')
-            && part.contains(')')
-            && !operators.iter().any(|op| part.contains(op))
+        if part.contains('(') && part.contains(')') && !operators.iter().any(|op| part.contains(op))
         {
             return false;
         }
@@ -433,9 +428,13 @@ mod tests {
     #[test]
     fn valid_rule_passes() {
         let checker = test_checker();
-        let result =
-            checker.validate("high_risk(X) :- transactions(X), X.fraud_prob > 0.9, X.amount > 10000.");
-        assert!(result.is_valid, "Expected valid, got: {}", result.diagnostic_string());
+        let result = checker
+            .validate("high_risk(X) :- transactions(X), X.fraud_prob > 0.9, X.amount > 10000.");
+        assert!(
+            result.is_valid,
+            "Expected valid, got: {}",
+            result.diagnostic_string()
+        );
     }
 
     #[test]
@@ -443,7 +442,12 @@ mod tests {
         let checker = test_checker();
         let result = checker.validate("bad(X) :- nonexistent_table(X), X.foo > 1.");
         assert!(!result.is_valid);
-        assert!(result.errors.iter().any(|e| e.category == ValidationCategory::Vocabulary));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.category == ValidationCategory::Vocabulary)
+        );
     }
 
     #[test]
@@ -451,8 +455,18 @@ mod tests {
         let checker = test_checker();
         let result = checker.validate("bad(X) :- transctions(X), X.amount > 1.");
         assert!(!result.is_valid);
-        let vocab_err = result.errors.iter().find(|e| e.category == ValidationCategory::Vocabulary).unwrap();
-        assert!(vocab_err.suggestion.as_ref().unwrap().contains("transactions"));
+        let vocab_err = result
+            .errors
+            .iter()
+            .find(|e| e.category == ValidationCategory::Vocabulary)
+            .unwrap();
+        assert!(
+            vocab_err
+                .suggestion
+                .as_ref()
+                .unwrap()
+                .contains("transactions")
+        );
     }
 
     #[test]
@@ -460,7 +474,12 @@ mod tests {
         let checker = test_checker();
         let result = checker.validate("bad(X) :- transactions(X), X.amount > 'high'.");
         assert!(!result.is_valid);
-        assert!(result.errors.iter().any(|e| e.category == ValidationCategory::TypeMismatch));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.category == ValidationCategory::TypeMismatch)
+        );
     }
 
     #[test]
@@ -468,7 +487,12 @@ mod tests {
         let checker = test_checker();
         let result = checker.validate("bad(X) :- transactions(X), X.region = EU.");
         assert!(!result.is_valid);
-        assert!(result.errors.iter().any(|e| e.category == ValidationCategory::TypeMismatch));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.category == ValidationCategory::TypeMismatch)
+        );
     }
 
     #[test]
@@ -476,7 +500,12 @@ mod tests {
         let checker = test_checker();
         let result = checker.validate("");
         assert!(!result.is_valid);
-        assert!(result.errors.iter().any(|e| e.category == ValidationCategory::Syntax));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.category == ValidationCategory::Syntax)
+        );
     }
 
     #[test]
@@ -492,9 +521,11 @@ mod tests {
         let checker = test_checker();
         // Recursive rules reference their own head — this should not be flagged
         // as a vocabulary error.
-        let result = checker.validate(
-            "inferred(A, X) :- transactions(A), inferred(A, X)."
+        let result = checker.validate("inferred(A, X) :- transactions(A), inferred(A, X).");
+        assert!(
+            result.is_valid,
+            "Recursive self-reference should not fail vocabulary check: {}",
+            result.diagnostic_string()
         );
-        assert!(result.is_valid, "Recursive self-reference should not fail vocabulary check: {}", result.diagnostic_string());
     }
 }

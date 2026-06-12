@@ -4,8 +4,8 @@
 //! Strict Two-Phase Locking (2PL) based on runtime contention metrics.
 //! Inspired by NeurDB's Learned Concurrency Control (LCC).
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -213,10 +213,7 @@ impl AdaptiveConcurrencyController {
                     let active = self.active.read();
                     active.iter().any(|other| {
                         other.txn_id != txn.txn_id
-                            && txn
-                                .write_set
-                                .iter()
-                                .any(|w| other.write_set.contains(w))
+                            && txn.write_set.iter().any(|w| other.write_set.contains(w))
                     })
                 }; // read lock dropped here
 
@@ -236,7 +233,8 @@ impl AdaptiveConcurrencyController {
         }
 
         self.committed_txns.fetch_add(1, Ordering::Relaxed);
-        self.total_duration_us.fetch_add(duration, Ordering::Relaxed);
+        self.total_duration_us
+            .fetch_add(duration, Ordering::Relaxed);
         self.remove_active(&txn.txn_id);
 
         debug!(
