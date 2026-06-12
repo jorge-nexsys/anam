@@ -145,7 +145,7 @@ AnamDB is in active development. The core engine is functional and tested:
 
 ```
 $ cargo test
-test result: ok. 54 passed; 0 failed; 0 ignored
+test result: ok. 93 passed; 0 failed; 0 ignored
 ```
 
 ## License

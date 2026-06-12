@@ -1,7 +1,8 @@
 //! Execution engine: custom DataFusion operators, Pareto optimizer,
-//! heterogeneous hardware dispatcher, distributed task routing, and
-//! 5-stage symbolic integration pipeline.
+//! heterogeneous hardware dispatcher, distributed task routing,
+//! adaptive concurrency control, and 5-stage symbolic integration pipeline.
 
+pub mod concurrency;
 pub mod dispatcher;
 pub mod distributed_optimizer;
 pub mod fao_udf;

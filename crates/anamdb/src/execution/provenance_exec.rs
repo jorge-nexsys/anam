@@ -128,7 +128,7 @@ impl ExecutionPlan for ProvenanceExec {
                     let prov_bytes: Vec<Vec<u8>> = (0..num_rows)
                         .map(|row_idx| {
                             match mode {
-                                ProvenanceMode::Boolean => {
+                                ProvenanceMode::Boolean | ProvenanceMode::Adaptive => {
                                     vec![1u8] // EXISTS = true
                                 }
                                 ProvenanceMode::Probability => 1.0_f64.to_le_bytes().to_vec(),

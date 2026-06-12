@@ -6,10 +6,24 @@
 
 use async_trait::async_trait;
 use datafusion::arrow::array::RecordBatch;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::core::error::Result;
+
+/// Device affinity for hardware-dispatched inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeviceAffinity {
+    /// No preference — use any available device.
+    Any,
+    /// Prefer CPU execution.
+    Cpu,
+    /// Prefer GPU execution.
+    Gpu,
+    /// Prefer NPU/accelerator execution.
+    Npu,
+}
 
 /// A single inference function that can be wired into a DataFusion physical plan.
 ///
@@ -30,7 +44,7 @@ pub trait FaoOperator: Send + Sync + std::fmt::Debug {
     fn input_schema(&self) -> &Arc<Schema>;
 
     /// Produced output schema.
-    fn output_schema(&self) -> &Arc<Schema>;
+    fn output_schema(&self) -> SchemaRef;
 
     /// Run inference on a batch and return the augmented output batch.
     async fn execute(&self, input: RecordBatch) -> Result<RecordBatch>;
@@ -40,6 +54,12 @@ pub trait FaoOperator: Send + Sync + std::fmt::Debug {
 
     /// Estimated accuracy.
     fn estimated_accuracy(&self) -> f64;
+
+    /// Preferred device affinity for hardware dispatch.
+    /// Returns `None` for no preference (equivalent to `DeviceAffinity::Any`).
+    fn device_affinity(&self) -> Option<DeviceAffinity> {
+        None
+    }
 }
 
 /// A versioned reference to an FAO operator, used by the optimizer to

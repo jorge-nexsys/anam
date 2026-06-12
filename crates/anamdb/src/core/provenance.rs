@@ -223,6 +223,57 @@ pub enum ProvenanceMode {
     /// Full polynomial lineage.
     #[default]
     Polynomial,
+    /// Adaptive: automatically degrades based on batch size.
+    /// ≤ 1,000 rows → Polynomial, ≤ 10,000 → Probability, > 10,000 → Boolean.
+    Adaptive,
+}
+
+/// Selects the concrete provenance mode based on batch size.
+///
+/// Resolves the "scalability paradox" by automatically downgrading
+/// provenance granularity for large result sets.
+pub struct AdaptiveProvenanceSelector {
+    /// Threshold below which Polynomial (full lineage) is used.
+    pub polynomial_threshold: usize,
+    /// Threshold below which Probability (confidence) is used.
+    /// Above this, Boolean is used.
+    pub probability_threshold: usize,
+}
+
+impl Default for AdaptiveProvenanceSelector {
+    fn default() -> Self {
+        Self {
+            polynomial_threshold: 1_000,
+            probability_threshold: 10_000,
+        }
+    }
+}
+
+impl AdaptiveProvenanceSelector {
+    /// Create a selector with custom thresholds.
+    pub fn new(polynomial_threshold: usize, probability_threshold: usize) -> Self {
+        Self {
+            polynomial_threshold,
+            probability_threshold,
+        }
+    }
+
+    /// Select the appropriate provenance mode for the given batch size.
+    pub fn select(&self, mode: ProvenanceMode, batch_size: usize) -> ProvenanceMode {
+        match mode {
+            ProvenanceMode::Adaptive => {
+                if batch_size <= self.polynomial_threshold {
+                    ProvenanceMode::Polynomial
+                } else if batch_size <= self.probability_threshold {
+                    ProvenanceMode::Probability
+                } else {
+                    ProvenanceMode::Boolean
+                }
+            }
+            // Non-adaptive modes pass through unchanged.
+            other => other,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -267,5 +318,41 @@ mod tests {
         let bytes = original.to_bytes().unwrap();
         let decoded = ProbSemiring::from_bytes(&bytes).unwrap();
         assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn adaptive_small_batch_uses_polynomial() {
+        let selector = AdaptiveProvenanceSelector::default();
+        assert_eq!(
+            selector.select(ProvenanceMode::Adaptive, 500),
+            ProvenanceMode::Polynomial
+        );
+    }
+
+    #[test]
+    fn adaptive_medium_batch_uses_probability() {
+        let selector = AdaptiveProvenanceSelector::default();
+        assert_eq!(
+            selector.select(ProvenanceMode::Adaptive, 5_000),
+            ProvenanceMode::Probability
+        );
+    }
+
+    #[test]
+    fn adaptive_large_batch_uses_boolean() {
+        let selector = AdaptiveProvenanceSelector::default();
+        assert_eq!(
+            selector.select(ProvenanceMode::Adaptive, 50_000),
+            ProvenanceMode::Boolean
+        );
+    }
+
+    #[test]
+    fn fixed_mode_ignores_batch_size() {
+        let selector = AdaptiveProvenanceSelector::default();
+        assert_eq!(
+            selector.select(ProvenanceMode::Polynomial, 999_999),
+            ProvenanceMode::Polynomial
+        );
     }
 }

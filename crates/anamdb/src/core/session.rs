@@ -15,7 +15,9 @@ use tracing::{info, instrument};
 use crate::execution::fao_udf::FaoScalarUdf;
 
 use crate::core::error::{AnamError, Result};
-use crate::core::provenance::{PolynomialSemiring, ProvenanceMode, ProvenanceToken, Semiring};
+use crate::core::provenance::{
+    AdaptiveProvenanceSelector, PolynomialSemiring, ProvenanceMode, ProvenanceToken, Semiring,
+};
 use crate::execution::dispatcher::DevicePool;
 use crate::execution::optimizer::ParetoOptimizer;
 use crate::hitl::monitor::SemanticMonitor;
@@ -273,9 +275,18 @@ impl Session {
     // ── Query execution ────────────────────────────────────────────────
 
     /// Execute a neurosymbolic SQL query.
+    ///
+    /// Supports standard SQL, constraint-annotated SQL (`WITH (max_latency_ms = ...)`),
+    /// and the extended `PREDICT CLASS OF` / `PREDICT VALUE OF` syntax.
     #[instrument(skip(self))]
     pub async fn sql(&self, query: &str) -> Result<QueryResult> {
         info!(query, "executing neurosymbolic query");
+
+        // ── PREDICT SQL interception ──────────────────────────────────
+        let upper = query.trim().to_uppercase();
+        if upper.starts_with("PREDICT ") {
+            return self.execute_predict(query).await;
+        }
 
         let (clean_sql, constraints) = self.optimizer.parse_constraints(query)?;
 
@@ -303,6 +314,71 @@ impl Session {
 
         Ok(QueryResult {
             batches,
+            anomalies,
+            reasoning_tree,
+        })
+    }
+
+    /// Execute a PREDICT SQL query.
+    ///
+    /// Intercepts `PREDICT CLASS OF <col> FROM <table> WITH (model = '...')`
+    /// and routes through the FAO operator pipeline.
+    async fn execute_predict(&self, query: &str) -> Result<QueryResult> {
+        let (target_col, source_table, model_name, pred_type) =
+            ParetoOptimizer::parse_predict_query(query).ok_or_else(|| {
+                AnamError::QueryParse(format!("could not parse PREDICT query: {query}"))
+            })?;
+
+        info!(
+            target = %target_col,
+            table = %source_table,
+            model = %model_name,
+            pred_type = ?pred_type,
+            "executing PREDICT query"
+        );
+
+        // Fetch base data from the source table.
+        let select_sql = format!("SELECT * FROM {source_table}");
+        let df = self
+            .df_ctx
+            .sql(&select_sql)
+            .await
+            .map_err(AnamError::DataFusion)?;
+        let batches = df.collect().await.map_err(AnamError::DataFusion)?;
+
+        // Find the FAO operator for the requested model.
+        let operator = self
+            .model_registry
+            .get_latest_operator(&model_name)
+            .map_err(|_| {
+                AnamError::ModelNotFound(format!(
+                    "model '{}' not found for PREDICT query",
+                    model_name
+                ))
+            })?;
+
+        // Execute the FAO operator against each batch.
+        let mut result_batches = Vec::with_capacity(batches.len());
+        for batch in &batches {
+            match operator.execute(batch.clone()).await {
+                Ok(result) => result_batches.push(result),
+                Err(e) => {
+                    tracing::warn!(
+                        model = %model_name,
+                        error = %e,
+                        "PREDICT FAO execution failed — falling back to raw batch"
+                    );
+                    result_batches.push(batch.clone());
+                }
+            }
+        }
+
+        let result_batches = self.attach_provenance(&result_batches)?;
+        let anomalies = self.monitor.inspect_batches(&result_batches)?;
+        let reasoning_tree = self.build_reasoning_tree(&result_batches)?;
+
+        Ok(QueryResult {
+            batches: result_batches,
             anomalies,
             reasoning_tree,
         })
@@ -601,8 +677,8 @@ impl Session {
 
     /// Attach provenance column to every output batch.
     ///
-    /// Each row gets a `provenance: Binary` column encoding lineage as a
-    /// Polynomial semiring token, tracking the query pipeline and row index.
+    /// Uses adaptive provenance selection when configured: automatically
+    /// downgrades from Polynomial → Probability → Boolean based on batch size.
     fn attach_provenance(&self, batches: &[RecordBatch]) -> Result<Vec<RecordBatch>> {
         use datafusion::arrow::array::{ArrayRef, BinaryArray};
         use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -611,7 +687,12 @@ impl Session {
             return Ok(batches.to_vec());
         }
 
-        let mode = self.config.provenance_mode;
+        let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+
+        // Adaptive mode: select the appropriate provenance mode based on batch size.
+        let selector = AdaptiveProvenanceSelector::default();
+        let mode = selector.select(self.config.provenance_mode, total_rows);
+
         let mut result = Vec::with_capacity(batches.len());
 
         for batch in batches {
@@ -626,7 +707,7 @@ impl Session {
             // Generate provenance bytes for each row.
             let prov_bytes: Vec<Vec<u8>> = (0..num_rows)
                 .map(|row_idx| match mode {
-                    ProvenanceMode::Boolean => vec![1u8],
+                    ProvenanceMode::Boolean | ProvenanceMode::Adaptive => vec![1u8],
                     ProvenanceMode::Probability => 1.0_f64.to_le_bytes().to_vec(),
                     ProvenanceMode::Polynomial => {
                         let token = ProvenanceToken {

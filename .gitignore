@@ -22,3 +22,6 @@ dist/
 build/
 .venv/
 .pytest_cache/
+
+# Papers
+papers/

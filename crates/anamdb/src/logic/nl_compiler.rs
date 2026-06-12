@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, instrument};
 
 use crate::core::error::{AnamError, Result};
+use crate::logic::canonical;
+use crate::logic::datalog_checker::DatalogChecker;
 
 /// Default LLM endpoint (OpenAI-compatible).
 const DEFAULT_ENDPOINT: &str = "https://api.openai.com/v1/chat/completions";
@@ -21,6 +23,8 @@ pub struct NlCompiler {
     endpoint: String,
     model: String,
     client: Client,
+    /// Optional schema checker for post-generation validation.
+    checker: Option<DatalogChecker>,
 }
 
 impl NlCompiler {
@@ -34,7 +38,19 @@ impl NlCompiler {
             endpoint: endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
             model: model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
             client: Client::new(),
+            checker: None,
         }
+    }
+
+    /// Attach a schema checker for post-generation validation.
+    pub fn with_checker(mut self, checker: DatalogChecker) -> Self {
+        self.checker = Some(checker);
+        self
+    }
+
+    /// Set the schema checker after construction.
+    pub fn set_checker(&mut self, checker: DatalogChecker) {
+        self.checker = Some(checker);
     }
 
     /// Compile a natural-language description into a Datalog rule.
@@ -122,8 +138,18 @@ Examples:
 
         debug!(datalog = %datalog, "LLM generated Datalog");
 
-        // Validate the generated Datalog before returning.
+        // Basic structural validation.
         self.validate_output(&datalog)?;
+
+        // Schema-aware validation via PQC (if checker is configured).
+        let datalog = if let Some(checker) = &self.checker {
+            self.validate_and_retry(checker, &datalog, nl, table, api_key).await?
+        } else {
+            datalog
+        };
+
+        // Canonical normalization for consistent caching/indexing.
+        let datalog = canonical::normalize(&datalog);
 
         Ok(datalog)
     }
@@ -155,6 +181,89 @@ Examples:
         }
 
         Ok(())
+    }
+
+    /// Validate via PQC and re-prompt the LLM on failure (up to 2 retries).
+    async fn validate_and_retry(
+        &self,
+        checker: &DatalogChecker,
+        initial_datalog: &str,
+        nl: &str,
+        table: &str,
+        api_key: &str,
+    ) -> Result<String> {
+        let max_retries: usize = 2;
+        let mut current = initial_datalog.to_string();
+
+        for attempt in 0..=max_retries {
+            let result = checker.validate(&current);
+            if result.is_valid {
+                return Ok(current);
+            }
+
+            if attempt == max_retries {
+                tracing::warn!(
+                    errors = %result.diagnostic_string(),
+                    "PQC validation failed after {max_retries} retries — accepting with warnings"
+                );
+                return Ok(current);
+            }
+
+            tracing::info!(
+                attempt = attempt + 1,
+                errors = %result.diagnostic_string(),
+                "PQC validation failed — re-prompting LLM"
+            );
+
+            // Re-prompt with error context.
+            let correction_prompt = format!(
+                "Your previous Datalog output had validation errors:\n{}\n\n\
+                 Please fix the Datalog rule for this request:\n\
+                 NL: \"{nl}\"\nTable: {table}\n\n\
+                 Output ONLY the corrected Datalog rule — no explanations.",
+                result.diagnostic_string()
+            );
+
+            let request = ChatCompletionRequest {
+                model: self.model.clone(),
+                messages: vec![
+                    ChatMessage {
+                        role: "system".into(),
+                        content: "You are a Datalog compiler. Fix the rule based on the validation errors.".into(),
+                    },
+                    ChatMessage {
+                        role: "user".into(),
+                        content: correction_prompt,
+                    },
+                ],
+                temperature: 0.0,
+                max_tokens: 256,
+            };
+
+            let response = self
+                .client
+                .post(&self.endpoint)
+                .header("Authorization", format!("Bearer {api_key}"))
+                .header("Content-Type", "application/json")
+                .json(&request)
+                .send()
+                .await?;
+
+            if !response.status().is_success() {
+                // Can't re-prompt — accept what we have.
+                return Ok(current);
+            }
+
+            let completion: ChatCompletionResponse = response.json().await?;
+            if let Some(choice) = completion.choices.first() {
+                let retry_datalog = choice.message.content.trim().to_string();
+                if self.validate_output(&retry_datalog).is_ok() {
+                    current = retry_datalog;
+                }
+            }
+        }
+
+        Ok(current)
     }
 }
 

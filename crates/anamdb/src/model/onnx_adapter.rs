@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion::arrow::array::{Array, ArrayRef, Float32Array, Float64Array, RecordBatch};
-use datafusion::arrow::datatypes::{DataType, Schema};
+use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef};
 use ort::session::Session as OrtSession;
 use parking_lot::Mutex;
 use tracing::{debug, instrument};
@@ -80,8 +80,8 @@ impl FaoOperator for OnnxFaoOperator {
         &self.input_schema
     }
 
-    fn output_schema(&self) -> &Arc<Schema> {
-        &self.output_schema
+    fn output_schema(&self) -> SchemaRef {
+        self.output_schema.clone()
     }
 
     async fn execute(&self, input: RecordBatch) -> Result<RecordBatch> {

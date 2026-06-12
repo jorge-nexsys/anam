@@ -149,8 +149,9 @@ impl ParetoOptimizer {
 
     /// Execute a DataFrame with multi-objective constraints.
     ///
-    /// This enumerates candidate plans from the model registry, computes the
-    /// Pareto frontier, selects the best feasible plan, and executes it.
+    /// Enumerates candidate plans from the model registry, computes the
+    /// Pareto frontier, selects the best feasible plan, and executes the
+    /// selected FAO operator against the input batches.
     #[instrument(skip(self, df))]
     pub async fn execute_with_constraints(
         &self,
@@ -159,43 +160,145 @@ impl ParetoOptimizer {
     ) -> Result<Vec<RecordBatch>> {
         info!(?constraints, "executing with Pareto optimization");
 
-        // For the MVP, we execute the standard DataFusion plan and apply
-        // post-hoc filtering. In production, this would rewrite the physical
-        // plan to inject the optimal FAO operators.
+        // Collect the base batches from DataFusion.
         let batches = df.collect().await.map_err(AnamError::DataFusion)?;
 
-        // Log the optimization decision.
+        // Enumerate FAO operators and compute the Pareto frontier.
         let operators = self.registry.list_operators();
-        if !operators.is_empty() {
-            let candidates =
-                self.enumerate_candidates(&operators, batches.iter().map(|b| b.num_rows()).sum());
-            let frontier = self.compute_pareto_frontier(&candidates);
-            let feasible: Vec<_> = frontier
-                .iter()
-                .filter(|c| c.satisfies(&constraints))
-                .collect();
+        if operators.is_empty() {
+            debug!("no FAO operators registered — returning base results");
+            return Ok(batches);
+        }
 
-            if feasible.is_empty() {
-                warn!("no feasible plan on Pareto frontier — using default execution");
-            } else {
-                let best = feasible
-                    .iter()
-                    .min_by(|a, b| {
-                        a.est_latency_ms
-                            .partial_cmp(&b.est_latency_ms)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .unwrap();
-                info!(
-                    fao = %best.fao_ref.function_id,
-                    latency = best.est_latency_ms,
-                    accuracy = best.est_accuracy,
-                    "selected optimal plan from Pareto frontier"
-                );
+        let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        let candidates = self.enumerate_candidates(&operators, total_rows);
+        let frontier = self.compute_pareto_frontier(&candidates);
+        let feasible: Vec<_> = frontier
+            .iter()
+            .filter(|c| c.satisfies(&constraints))
+            .collect();
+
+        if feasible.is_empty() {
+            warn!("no feasible plan on Pareto frontier — using default execution");
+            return Ok(batches);
+        }
+
+        // Select the best feasible plan (lowest latency, break ties by accuracy).
+        let best = feasible
+            .iter()
+            .min_by(|a, b| {
+                a.est_latency_ms
+                    .partial_cmp(&b.est_latency_ms)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+
+        info!(
+            fao = %best.fao_ref.function_id,
+            latency = best.est_latency_ms,
+            accuracy = best.est_accuracy,
+            cost = best.est_cost,
+            "selected optimal plan — executing FAO operator"
+        );
+
+        // Execute the selected FAO operator against the base batches.
+        let operator = self
+            .registry
+            .get_latest_operator(&best.fao_ref.function_id)
+            .map_err(|_| {
+                AnamError::Inference(format!(
+                    "FAO operator '{}' not found in registry",
+                    best.fao_ref.function_id
+                ))
+            })?;
+
+        let mut result_batches = Vec::with_capacity(batches.len());
+        for batch in &batches {
+            match operator.execute(batch.clone()).await {
+                Ok(result) => result_batches.push(result),
+                Err(e) => {
+                    warn!(
+                        fao = %best.fao_ref.function_id,
+                        error = %e,
+                        "FAO execution failed for batch — falling back to raw batch"
+                    );
+                    result_batches.push(batch.clone());
+                }
             }
         }
 
-        Ok(batches)
+        Ok(result_batches)
+    }
+
+    /// Parse a `PREDICT` SQL query and extract model/target information.
+    ///
+    /// Supported syntax:
+    /// - `PREDICT CLASS OF <column> FROM <table> WITH (model = '<name>')`
+    /// - `PREDICT VALUE OF <column> FROM <table> WITH (model = '<name>')`
+    ///
+    /// Returns `(target_column, source_table, model_name, prediction_type)`.
+    pub fn parse_predict_query(
+        query: &str,
+    ) -> Option<(String, String, String, PredictionType)> {
+        let upper = query.trim().to_uppercase();
+
+        let pred_type = if upper.starts_with("PREDICT CLASS OF") {
+            Some(PredictionType::Classification)
+        } else if upper.starts_with("PREDICT VALUE OF") {
+            Some(PredictionType::Regression)
+        } else {
+            None
+        }?;
+
+        // Extract target column: word after "OF".
+        let after_of = query
+            .trim()
+            .split_whitespace()
+            .collect::<Vec<_>>();
+
+        // Format: PREDICT [CLASS|VALUE] OF <col> FROM <table> [WITH (model = '...')]
+        let of_idx = after_of.iter().position(|w| w.eq_ignore_ascii_case("OF"))?;
+        let from_idx = after_of.iter().position(|w| w.eq_ignore_ascii_case("FROM"))?;
+
+        if of_idx + 1 >= from_idx || from_idx + 1 >= after_of.len() {
+            return None;
+        }
+
+        let target_column = after_of[of_idx + 1].to_string();
+        let source_table = after_of[from_idx + 1].to_string();
+
+        // Extract model name from WITH clause.
+        let model_name = if let Some(with_idx) = upper.find("WITH") {
+            let with_part = &query.trim()[with_idx..];
+            // Look for model = 'name' or model = "name".
+            let model_re_start = with_part.find("model").or_else(|| with_part.find("MODEL"));
+            if let Some(start) = model_re_start {
+                let after_eq = &with_part[start..];
+                if let Some(eq_idx) = after_eq.find('=') {
+                    let val = after_eq[eq_idx + 1..].trim();
+                    let val = val.trim_start_matches('(').trim();
+                    let name = val
+                        .trim_matches(|c: char| c == '\'' || c == '"' || c == ')' || c == ' ');
+                    name.to_string()
+                } else {
+                    "default".to_string()
+                }
+            } else {
+                "default".to_string()
+            }
+        } else {
+            "default".to_string()
+        };
+
+        info!(
+            pred_type = ?pred_type,
+            target = %target_column,
+            table = %source_table,
+            model = %model_name,
+            "parsed PREDICT query"
+        );
+
+        Some((target_column, source_table, model_name, pred_type))
     }
 
     /// Enumerate candidate plans from FAO variants.
@@ -239,6 +342,15 @@ impl ParetoOptimizer {
 
         frontier
     }
+}
+
+/// Type of prediction for PREDICT SQL queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PredictionType {
+    /// PREDICT CLASS OF — classification task.
+    Classification,
+    /// PREDICT VALUE OF — regression task.
+    Regression,
 }
 
 #[cfg(test)]

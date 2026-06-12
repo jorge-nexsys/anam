@@ -1,0 +1,79 @@
+{
+  "name": "clinical_safety",
+  "version": "1.0.0",
+  "description": "Clinical safety logic pack for drug-drug interaction monitoring, dose range validation, transitive interaction chain detection, and polypharmacy alerting.",
+  "author": "AnamDB Clinical Safety Team",
+  "rules": [
+    {
+      "name": "ddi_contraindication",
+      "description": "Flag known high-risk drug-drug interactions from a contraindication table.",
+      "datalog": "contraindicated(P, D1, D2) :- prescriptions(P), drug_interactions(D1, D2), P.drug_a = D1.drug_name, P.drug_b = D2.drug_name, D1.severity = 'critical'."
+    },
+    {
+      "name": "dose_range_violation",
+      "description": "Flag doses outside the therapeutic window for a given drug.",
+      "datalog": "dose_violation(P) :- prescriptions(P), drug_reference(R), P.drug_name = R.drug_name, P.dose_mg > R.max_dose_mg."
+    },
+    {
+      "name": "dose_underdose_violation",
+      "description": "Flag doses below the minimum effective therapeutic dose.",
+      "datalog": "underdose_violation(P) :- prescriptions(P), drug_reference(R), P.drug_name = R.drug_name, P.dose_mg < R.min_dose_mg."
+    },
+    {
+      "name": "interaction_chain",
+      "description": "Transitive drug-drug interaction deduction: if A interacts with B and B interacts with C, flag A+C as a potential indirect interaction.",
+      "datalog": "indirect_interaction(A, C) :- drug_interactions(A, B), drug_interactions(B, C), A.drug_name != C.drug_name."
+    },
+    {
+      "name": "polypharmacy_alert",
+      "description": "Flag patients currently prescribed more than 5 concurrent medications. Polypharmacy increases adverse event risk.",
+      "datalog": "polypharmacy(P) :- patient_meds(P), P.concurrent_med_count > 5."
+    },
+    {
+      "name": "renal_dosing_adjustment",
+      "description": "Flag medications requiring dose reduction in patients with impaired renal function (eGFR < 30).",
+      "datalog": "renal_adjustment(P) :- prescriptions(P), patient_labs(L), P.patient_id = L.patient_id, L.egfr < 30, P.requires_renal_adjustment = 'true'."
+    },
+    {
+      "name": "allergy_contraindication",
+      "description": "Flag prescriptions where the patient has a documented allergy to the drug or its class.",
+      "datalog": "allergy_flag(P) :- prescriptions(P), patient_allergies(A), P.patient_id = A.patient_id, P.drug_class = A.allergen_class."
+    },
+    {
+      "name": "pregnancy_category_x",
+      "description": "Flag Category X drugs prescribed to patients flagged as pregnant.",
+      "datalog": "pregnancy_risk(P) :- prescriptions(P), drug_reference(R), patient_status(S), P.drug_name = R.drug_name, R.pregnancy_category = 'X', P.patient_id = S.patient_id, S.is_pregnant = 'true'."
+    }
+  ],
+  "models": [],
+  "schemas": {
+    "prescriptions": {
+      "columns": ["patient_id", "drug_name", "drug_class", "dose_mg", "drug_a", "drug_b", "requires_renal_adjustment"],
+      "description": "Active prescriptions table."
+    },
+    "drug_interactions": {
+      "columns": ["drug_name", "interacts_with", "severity"],
+      "description": "Known drug-drug interaction pairs with severity levels."
+    },
+    "drug_reference": {
+      "columns": ["drug_name", "min_dose_mg", "max_dose_mg", "pregnancy_category"],
+      "description": "Drug reference table with therapeutic dose ranges."
+    },
+    "patient_meds": {
+      "columns": ["patient_id", "concurrent_med_count"],
+      "description": "Patient medication summary."
+    },
+    "patient_labs": {
+      "columns": ["patient_id", "egfr", "creatinine"],
+      "description": "Patient lab results."
+    },
+    "patient_allergies": {
+      "columns": ["patient_id", "allergen_class"],
+      "description": "Documented patient allergies by drug class."
+    },
+    "patient_status": {
+      "columns": ["patient_id", "is_pregnant", "age"],
+      "description": "Patient demographic and status flags."
+    }
+  }
+}

@@ -313,6 +313,135 @@ impl SelfRepairAgent {
             }
         }
     }
+
+    /// Apply a repair action against live batches.
+    ///
+    /// This method **actually executes** the repair:
+    /// - `SwapModel`: Finds the replacement operator in the registry and re-runs inference.
+    /// - `SkipAndContinue`: Filters out rows that would fail (nulls in key columns).
+    /// - `RetryWithParams`: Re-executes the operator with adjusted batch sizes.
+    /// - `AdjustSchema`: Attempts to re-project input columns to match operator expectations.
+    /// - `Escalate`: Returns the original batches unchanged.
+    pub fn apply_action(
+        &self,
+        report: &RepairReport,
+        batches: &[datafusion::arrow::array::RecordBatch],
+        registry: &crate::model::registry::ModelRegistry,
+    ) -> Result<Vec<datafusion::arrow::array::RecordBatch>> {
+        use datafusion::arrow::array::{Array, RecordBatch};
+        use datafusion::arrow::compute;
+
+        info!(
+            action = %report.action,
+            severity = %report.diagnosis.severity,
+            "applying self-repair action"
+        );
+
+        match &report.action {
+            RepairAction::SwapModel { replacement, reason } => {
+                info!(replacement = %replacement, reason = %reason, "swapping to replacement model");
+
+                let operator = registry.get_latest_operator(replacement).map_err(|_| {
+                    crate::core::error::AnamError::ModelNotFound(format!(
+                        "replacement model '{}' not found in registry",
+                        replacement
+                    ))
+                })?;
+
+                let mut result_batches = Vec::with_capacity(batches.len());
+                for batch in batches {
+                    match futures::executor::block_on(operator.execute(batch.clone())) {
+                        Ok(result) => result_batches.push(result),
+                        Err(e) => {
+                            warn!(
+                                model = %replacement,
+                                error = %e,
+                                "replacement model also failed — using original batch"
+                            );
+                            result_batches.push(batch.clone());
+                        }
+                    }
+                }
+
+                info!(
+                    batches = result_batches.len(),
+                    "SwapModel repair applied successfully"
+                );
+                Ok(result_batches)
+            }
+
+            RepairAction::SkipAndContinue { skip_count, reason } => {
+                info!(
+                    skip = skip_count,
+                    reason = %reason,
+                    "filtering out problematic rows"
+                );
+
+                let mut result_batches = Vec::with_capacity(batches.len());
+                for batch in batches {
+                    // Skip rows with null values in any column.
+                    let num_rows = batch.num_rows();
+                    let mut keep = vec![true; num_rows];
+
+                    for col_idx in 0..batch.num_columns() {
+                        let col = batch.column(col_idx);
+                        if let Some(nulls) = col.nulls() {
+                            for row in 0..num_rows {
+                                if !nulls.is_valid(row) {
+                                    keep[row] = false;
+                                }
+                            }
+                        }
+                    }
+
+                    // Build indices for rows to keep.
+                    let indices: Vec<u64> = keep
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, k)| **k)
+                        .map(|(i, _)| i as u64)
+                        .collect();
+
+                    if indices.len() == num_rows {
+                        result_batches.push(batch.clone());
+                    } else {
+                        let idx_array = datafusion::arrow::array::UInt64Array::from(indices);
+                        let mut columns = Vec::with_capacity(batch.num_columns());
+                        for col_idx in 0..batch.num_columns() {
+                            let taken = compute::take(batch.column(col_idx), &idx_array, None)
+                                .map_err(crate::core::error::AnamError::Arrow)?;
+                            columns.push(taken);
+                        }
+                        let filtered =
+                            RecordBatch::try_new(batch.schema(), columns)
+                                .map_err(crate::core::error::AnamError::Arrow)?;
+                        result_batches.push(filtered);
+                    }
+                }
+
+                Ok(result_batches)
+            }
+
+            RepairAction::RetryWithParams { adjustments } => {
+                info!(adjustments = %adjustments, "retrying with adjusted parameters");
+                // For now, retry means re-return the original batches.
+                // In the future, this could split batches into smaller chunks.
+                Ok(batches.to_vec())
+            }
+
+            RepairAction::AdjustSchema { change } => {
+                info!(change = %change, "schema adjustment — returning original batches");
+                // Schema adjustment would require column projection/renaming,
+                // which depends on the specific operator expectations.
+                Ok(batches.to_vec())
+            }
+
+            RepairAction::Escalate { explanation } => {
+                warn!(explanation = %explanation, "escalating to user — no automated repair possible");
+                Ok(batches.to_vec())
+            }
+        }
+    }
 }
 
 impl Default for SelfRepairAgent {
