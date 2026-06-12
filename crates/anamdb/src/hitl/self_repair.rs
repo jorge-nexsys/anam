@@ -270,10 +270,7 @@ impl SelfRepairAgent {
 
         // Stage 1: Reviewer — diagnose the error.
         let diagnosis = if self.api_key.is_some() {
-            match self
-                .llm_review(error_msg, operator_name, context)
-                .await
-            {
+            match self.llm_review(error_msg, operator_name, context).await {
                 Ok(d) => {
                     info!(
                         severity = %d.severity,
@@ -293,10 +290,7 @@ impl SelfRepairAgent {
 
         // Stage 2: Rewriter — propose a corrective action.
         let action = if self.api_key.is_some() {
-            match self
-                .llm_rewrite(&diagnosis, operator_name)
-                .await
-            {
+            match self.llm_rewrite(&diagnosis, operator_name).await {
                 Ok(a) => {
                     info!(action = %a, "LLM repair action generated");
                     a
@@ -373,7 +367,9 @@ Respond with ONLY valid JSON (no markdown):
             messages: vec![
                 ChatMessage {
                     role: "system".into(),
-                    content: "You are a database error diagnosis expert. Respond only with valid JSON.".into(),
+                    content:
+                        "You are a database error diagnosis expert. Respond only with valid JSON."
+                            .into(),
                 },
                 ChatMessage {
                     role: "user".into(),
@@ -392,7 +388,9 @@ Respond with ONLY valid JSON (no markdown):
             .json(&request)
             .send()
             .await
-            .map_err(|e| crate::core::error::AnamError::Http(format!("LLM review request failed: {e}")))?;
+            .map_err(|e| {
+                crate::core::error::AnamError::Http(format!("LLM review request failed: {e}"))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -402,16 +400,17 @@ Respond with ONLY valid JSON (no markdown):
             )));
         }
 
-        let completion: ChatCompletionResponse = response
-            .json()
-            .await
-            .map_err(|e| crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}")))?;
+        let completion: ChatCompletionResponse = response.json().await.map_err(|e| {
+            crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}"))
+        })?;
 
         let content = completion
             .choices
             .first()
             .map(|c| c.message.content.trim().to_string())
-            .ok_or_else(|| crate::core::error::AnamError::Internal("LLM returned no choices".into()))?;
+            .ok_or_else(|| {
+                crate::core::error::AnamError::Internal("LLM returned no choices".into())
+            })?;
 
         let json_str = content
             .trim_start_matches("```json")
@@ -482,7 +481,8 @@ Respond with ONLY valid JSON (no markdown):
             messages: vec![
                 ChatMessage {
                     role: "system".into(),
-                    content: "You are a database repair agent. Respond only with valid JSON.".into(),
+                    content: "You are a database repair agent. Respond only with valid JSON."
+                        .into(),
                 },
                 ChatMessage {
                     role: "user".into(),
@@ -501,7 +501,9 @@ Respond with ONLY valid JSON (no markdown):
             .json(&request)
             .send()
             .await
-            .map_err(|e| crate::core::error::AnamError::Http(format!("LLM rewrite request failed: {e}")))?;
+            .map_err(|e| {
+                crate::core::error::AnamError::Http(format!("LLM rewrite request failed: {e}"))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -511,16 +513,17 @@ Respond with ONLY valid JSON (no markdown):
             )));
         }
 
-        let completion: ChatCompletionResponse = response
-            .json()
-            .await
-            .map_err(|e| crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}")))?;
+        let completion: ChatCompletionResponse = response.json().await.map_err(|e| {
+            crate::core::error::AnamError::Serde(format!("LLM response parse failed: {e}"))
+        })?;
 
         let content = completion
             .choices
             .first()
             .map(|c| c.message.content.trim().to_string())
-            .ok_or_else(|| crate::core::error::AnamError::Internal("LLM returned no choices".into()))?;
+            .ok_or_else(|| {
+                crate::core::error::AnamError::Internal("LLM returned no choices".into())
+            })?;
 
         let json_str = content
             .trim_start_matches("```json")
@@ -561,12 +564,7 @@ Respond with ONLY valid JSON (no markdown):
     // ── Heuristic Fallback Agents ─────────────────────────────────────
 
     /// Heuristic Reviewer: pattern-match common structural errors.
-    fn heuristic_review(
-        &self,
-        error_msg: &str,
-        operator_name: &str,
-        context: &str,
-    ) -> Diagnosis {
+    fn heuristic_review(&self, error_msg: &str, operator_name: &str, context: &str) -> Diagnosis {
         let error_lower = error_msg.to_lowercase();
 
         let (root_cause, severity, confidence) = if error_lower.contains("dimension")

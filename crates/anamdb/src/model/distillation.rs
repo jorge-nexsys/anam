@@ -202,9 +202,7 @@ impl DistillationEngine {
 
         // 3. Evaluate student model potential.
         // Try LLM-assisted evaluation first; fall back to heuristic.
-        let student_stats = self
-            .evaluate_student(&teacher, &soft_labels, config)
-            .await;
+        let student_stats = self.evaluate_student(&teacher, &soft_labels, config).await;
 
         // 4. Evaluate Pareto position.
         let pareto_score = (teacher.avg_latency_ms / student_stats.latency_ms)
@@ -314,7 +312,10 @@ impl DistillationEngine {
         match fao_result {
             Ok(operator) => {
                 // Run real teacher inference on a synthetic batch.
-                match self.run_teacher_inference(operator, teacher, temperature).await {
+                match self
+                    .run_teacher_inference(operator, teacher, temperature)
+                    .await
+                {
                     Ok(labels) => labels,
                     Err(e) => {
                         warn!(
@@ -360,8 +361,7 @@ impl DistillationEngine {
                 .map(|i| Field::new(format!("feature_{i}"), DataType::Float32, false))
                 .collect::<Vec<_>>(),
         ));
-        let input_batch =
-            RecordBatch::try_new(batch_schema, columns).map_err(AnamError::Arrow)?;
+        let input_batch = RecordBatch::try_new(batch_schema, columns).map_err(AnamError::Arrow)?;
 
         // Run teacher inference.
         let output_batch = operator.execute(input_batch).await?;
@@ -372,8 +372,8 @@ impl DistillationEngine {
             let score_col = output_batch.column(0);
             let scores: Vec<f64> = if let Some(f64_arr) = score_col
                 .as_any()
-                .downcast_ref::<datafusion::arrow::array::Float64Array>()
-            {
+                .downcast_ref::<datafusion::arrow::array::Float64Array>(
+            ) {
                 f64_arr.values().iter().copied().collect()
             } else if let Some(f32_arr) = score_col.as_any().downcast_ref::<Float32Array>() {
                 f32_arr.values().iter().map(|v| *v as f64).collect()
@@ -488,10 +488,7 @@ impl DistillationEngine {
             .llm_endpoint
             .as_deref()
             .unwrap_or("https://api.openai.com/v1/chat/completions");
-        let model = config
-            .llm_model
-            .as_deref()
-            .unwrap_or("gpt-4o");
+        let model = config.llm_model.as_deref().unwrap_or("gpt-4o");
 
         // Compute some summary statistics from the soft labels.
         let avg_confidence: f64 = soft_labels
@@ -532,7 +529,9 @@ Respond with ONLY valid JSON (no markdown, no explanation):
             messages: vec![
                 ChatMessage {
                     role: "system".into(),
-                    content: "You are a precise ML evaluation assistant. Respond only with valid JSON.".into(),
+                    content:
+                        "You are a precise ML evaluation assistant. Respond only with valid JSON."
+                            .into(),
                 },
                 ChatMessage {
                     role: "user".into(),
@@ -747,7 +746,10 @@ mod tests {
         assert_eq!(student_entry.name, "fast_model_distilled");
         assert!(student_entry.avg_latency_ms < 10.0);
         assert!(student_entry.accuracy >= 0.80);
-        println!("\n  ✓ Student registered: {} @ {:.1}ms", student_entry.name, student_entry.avg_latency_ms);
+        println!(
+            "\n  ✓ Student registered: {} @ {:.1}ms",
+            student_entry.name, student_entry.avg_latency_ms
+        );
     }
 
     #[tokio::test]

@@ -119,7 +119,12 @@ impl FaoOperator for OnnxFaoOperator {
         // ── Device Pool dispatch ──────────────────────────────────────
         let assignment = if let Some(pool) = &self.device_pool {
             let job = ExecutionJob {
-                job_id: format!("{}@{}:{}", self.function_id, self.version, uuid::Uuid::new_v4()),
+                job_id: format!(
+                    "{}@{}:{}",
+                    self.function_id,
+                    self.version,
+                    uuid::Uuid::new_v4()
+                ),
                 preferred_device: self.affinity.to_device_type(),
                 est_cpu_time_ms: self.avg_latency_ms * (num_rows as f64 / 1000.0).max(1.0),
                 est_memory_bytes: (num_rows * 4 * self.input_schema.fields().len()) as u64,

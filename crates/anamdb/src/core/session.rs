@@ -169,9 +169,9 @@ impl Session {
 
         // Register the Datalog filter pushdown optimizer rule.
         let logic_rule = Arc::new(
-            crate::execution::logic_optimizer_rule::LogicOptimizerRule::new(
-                Arc::clone(&logic_engine),
-            ),
+            crate::execution::logic_optimizer_rule::LogicOptimizerRule::new(Arc::clone(
+                &logic_engine,
+            )),
         );
         df_ctx.add_optimizer_rule(logic_rule);
 
@@ -396,10 +396,8 @@ impl Session {
             .map_err(AnamError::DataFusion)?;
 
         use futures::TryStreamExt;
-        let result_batches: Vec<RecordBatch> = stream
-            .try_collect()
-            .await
-            .map_err(AnamError::DataFusion)?;
+        let result_batches: Vec<RecordBatch> =
+            stream.try_collect().await.map_err(AnamError::DataFusion)?;
 
         let result_batches = self.attach_provenance(&result_batches)?;
         let anomalies = self.monitor.inspect_batches(&result_batches)?;
@@ -705,7 +703,9 @@ impl Session {
             .collect();
         agent.register_available_models(model_names);
 
-        agent.diagnose_and_repair(error_msg, operator_name, context).await
+        agent
+            .diagnose_and_repair(error_msg, operator_name, context)
+            .await
     }
 
     // ── Internal helpers ───────────────────────────────────────────────

@@ -177,8 +177,10 @@ impl ExecutionPlan for PredictExec {
                                 match score_col.data_type() {
                                     DataType::Float64 => score_col.clone(),
                                     DataType::Float32 => {
-                                        let f32_arr =
-                                            score_col.as_any().downcast_ref::<Float32Array>().unwrap();
+                                        let f32_arr = score_col
+                                            .as_any()
+                                            .downcast_ref::<Float32Array>()
+                                            .unwrap();
                                         let f64_vals: Vec<f64> =
                                             f32_arr.values().iter().map(|v| *v as f64).collect();
                                         Arc::new(Float64Array::from(f64_vals))
@@ -207,8 +209,10 @@ impl ExecutionPlan for PredictExec {
                                         .collect(),
                                     _ => vec![0.0; batch.num_rows()],
                                 };
-                                let classes: Vec<i64> =
-                                    scores.iter().map(|s| if *s >= 0.5 { 1 } else { 0 }).collect();
+                                let classes: Vec<i64> = scores
+                                    .iter()
+                                    .map(|s| if *s >= 0.5 { 1 } else { 0 })
+                                    .collect();
                                 Arc::new(datafusion::arrow::array::Int64Array::from(classes))
                             }
                         };

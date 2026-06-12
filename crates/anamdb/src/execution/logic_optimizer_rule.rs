@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
-use datafusion_common::tree_node::Transformed;
-use datafusion_common::Result as DfResult;
-use datafusion_expr::{col, lit, Expr, LogicalPlan};
 use datafusion::optimizer::{ApplyOrder, OptimizerConfig, OptimizerRule};
+use datafusion_common::Result as DfResult;
+use datafusion_common::tree_node::Transformed;
+use datafusion_expr::{Expr, LogicalPlan, col, lit};
 use parking_lot::RwLock;
 use tracing::{debug, info};
 
@@ -102,12 +102,10 @@ impl OptimizerRule for LogicOptimizerRule {
                     "injecting Datalog predicates as Filter on TableScan"
                 );
 
-                let filtered = LogicalPlan::Filter(
-                    datafusion_expr::logical_plan::Filter::try_new(
-                        combined,
-                        Arc::new(plan),
-                    )?,
-                );
+                let filtered = LogicalPlan::Filter(datafusion_expr::logical_plan::Filter::try_new(
+                    combined,
+                    Arc::new(plan),
+                )?);
 
                 Ok(Transformed::yes(filtered))
             }
@@ -244,7 +242,10 @@ mod tests {
     #[test]
     fn extract_column_name_parses_var_dot_col() {
         assert_eq!(extract_column_name("X.amount"), Some("amount".into()));
-        assert_eq!(extract_column_name("T.region_code"), Some("region_code".into()));
+        assert_eq!(
+            extract_column_name("T.region_code"),
+            Some("region_code".into())
+        );
         assert_eq!(extract_column_name("plain_name"), None);
         assert_eq!(extract_column_name(""), None);
     }
