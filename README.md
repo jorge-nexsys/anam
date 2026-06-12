@@ -1,197 +1,153 @@
-# AnamDB
-### *The AI-Native Neurosymbolic Database Engine*
+<div align="center">
 
-![AnamDB Demo](demo.gif)
+<img src="./assets/full_logo_dark.svg" alt="AnamDB Logo" width="480">
 
-📚 **[Official Documentation & Guide](https://anamdb.github.io/anam-db/)**
+<b>AnamDB</b>: a neurosymbolic database engine for AI agents, fraud detection, and production reasoning. Built from scratch in Rust.
+<br/><br/>
+<h3>
+  <a href="https://anamdb.github.io/anam-db/">docs</a> |
+  <a href="https://crates.io/crates/anamdb">crates.io</a> |
+  <a href="https://pypi.org/project/anamdb">pypi</a>
+</h3>
 
-**AnamDB** is a vertical-agnostic, neurosymbolic database engine built in Rust. It natively integrates probabilistic neural perception with deterministic symbolic reasoning into a unified architecture — from a single-node kernel to a distributed multi-agent reasoning plane.
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://anamdb.github.io/anam-db/)
+[![crates.io](https://img.shields.io/crates/v/anamdb)](https://crates.io/crates/anamdb)
+[![PyPI](https://img.shields.io/pypi/v/anamdb)](https://pypi.org/project/anamdb)
+[![GitHub Repo stars](https://img.shields.io/github/stars/AnamDB/anam-db)](https://github.com/AnamDB/anam-db/stargazers)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-Unlike traditional vector databases that rely on semantic similarity or bolt-on LLMs, AnamDB treats **Models as First-Class Citizens** and **Logic as a Verifiable Blueprint**.
+</div>
 
----
+<hr>
 
-## Why AnamDB?
+AnamDB is a database engine that unifies SQL queries, Datalog logic rules, and ONNX model inference in a single kernel. Every result carries a provenance trace — a full lineage of which data, rules, and model versions produced it.
 
-| Capability | AnamDB | Vector DBs | SQL + ML | LLM Pipelines |
-|:---|:---|:---|:---|:---|
-| **Explainability** | Semiring provenance — every result traced to source | Similarity score only | No lineage | Black box |
-| **Safety** | Datalog guardrails block hallucinations at kernel level | None | Post-hoc validation | Prompt engineering |
-| **Optimization** | Pareto frontier (latency × accuracy × cost) | Latency only | Latency only | Token cost only |
-| **Hardware** | Metal / CUDA / NPU heterogeneous dispatch | CPU only | CPU + external GPU | API calls |
-| **Models** | AI-Tables — first-class model lifecycle management | External | External endpoints | Hardcoded |
-| **Human-in-Loop** | Semantic anomaly detection with interactive triage | Silent failures | Error logs | Chat-based retry |
-| **Distribution** | Network-aware task routing + global lineage | Sharding only | Federated queries | N/A |
+You don't need a separate vector database, ML serving layer, rules engine, or observability pipeline. AnamDB gives your agents explainable, guardrailed access to data with model inference built in — not bolted on.
 
----
+## Getting Started
 
-## Tech Stack
+### 1. Install the CLI
 
-| Layer | Component | Technology |
-|:---|:---|:---|
-| **Kernel** | Async runtime | Rust 2024 + `tokio` |
-| **Query Engine** | Optimizer + execution | Apache DataFusion (extended) |
-| **Logic** | Differentiable Datalog | `scallop-core` |
-| **Models** | AI-Tables + FAO registry | ONNX Runtime |
-| **Storage** | Columnar + vector | Lance 2.2 (Arrow-backed) |
-| **SDK** | Logic Packs + Explainer | JSON-based bundles |
-| **Distribution** | Task routing + BCNF catalog | Multi-agent cluster |
+```bash
+cargo install anam-cli
+```
 
----
-
-## Quick Start
-
-### 1. One-Liner Install
-
-If you have Rust installed, you can install the AnamDB CLI and server in seconds:
+Or build from source:
 
 ```bash
 cargo install --git https://github.com/AnamDB/anam-db anam-cli
 ```
 
-### 2. The "3-Minute Wow"
+### 2. Initialize a project
 
-Run the AnamDB interactive REPL:
+```bash
+mkdir my-project && cd my-project
+anam init
+```
+
+This scaffolds `anamdb.toml`, example queries, environment templates, and directory structure.
+
+### 3. Start the server
+
+```bash
+anam start
+```
+
+Or launch the interactive REPL:
 
 ```bash
 anam
 ```
 
-Once inside, download a community model, load some data, and run a neurosymbolic SQL query:
+### 4. Run your first query
 
 ```sql
--- 1. Download the community financial compliance pack
-anam> .hub install anamdb/financial-compliance@1.0.0
+-- Load a Lance dataset
+anam> .load /path/to/transactions.lance txns
 
--- 2. Ingest a sample dataset (100k rows)
-anam> .ingest demo/data/transactions_large.csv demo/data/transactions_large.lance
-anam> .load demo/data/transactions_large.lance txns
-
--- 3. Run a neurosymbolic query with Datalog-style constraints
-anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
-       FROM txns WHERE fraud_prob > 0.90 AND amount > 10000
-       GROUP BY region ORDER BY avg_fraud DESC;
-
--- 4. See exactly WHY the engine made those decisions
-anam> .explain
-```
-
-### Community Hub
-
-AnamDB includes a built-in package manager for models and logic:
-
-```bash
-# Search for community logic packs inside the REPL
-anam> .hub search fraud
-
-# Install the financial compliance pack
-anam> .hub install anamdb/financial-compliance@1.0.0
-```
-
-### Interactive Session
-
-```
-anam> .ingest demo/data/transactions_large.csv demo/data/transactions_large.lance
-✓ Ingested 100,000 rows
-
-anam> .load demo/data/transactions_large.lance txns
-Registered table 'txns'
-
-anam> .model load demo/models/fraud_detector.onnx fraud_detector 3 5.0 0.95
-✓ Loaded ONNX model 'fraud_detector'
-
+-- Register a Datalog guardrail
 anam> .logic high_risk "fraud_prob > 0.90 AND amount > 10000"
-✓ Registered rule 'high_risk'
 
+-- Query with model inference + logic filtering
 anam> SELECT region, COUNT(1) AS count, ROUND(AVG(fraud_prob), 4) AS avg_fraud
        FROM txns WHERE fraud_prob > 0.90 AND amount > 10000
        GROUP BY region ORDER BY avg_fraud DESC;
-+--------+-------+-----------+
-| region | count | avg_fraud |
-+--------+-------+-----------+
-| APAC   | 5321  | 0.7233    |
-| EU     | 36033 | 0.1374    |
-| US     | 48018 | 0.0800    |
-+--------+-------+-----------+
 
+-- See exactly WHY the engine made those decisions
 anam> .explain
+```
+
+```
 ═══ AnamDB Reasoning Trace ═══
   Provenance: Polynomial (full lineage tracking)
   Rules: high_risk ← fraud_prob > 0.90 AND amount > 10000
   Pareto Frontier: fraud_fast (0.050ms / 75%) ★ fraud_detector (0.500ms / 95%)
 ```
 
-### Rust SDK
+## Alternative installs
 
-```rust
-use anamdb::sdk::LogicPack;
-use anamdb::core::session::Session;
+### Python SDK
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let session = Session::new().await?;
-
-    // Load a domain-specific Logic Pack (rules + models in one JSON)
-    let pack = LogicPack::from_file("demo/packs/financial_compliance.json")?;
-    session.load_logic_pack(&pack)?;
-
-    // Query with automatic Pareto optimization
-    let batches = session.query("SELECT * FROM HighRisk").await?;
-
-    // Explain results with provenance tracing
-    let explanation = session.explain_query(&batches, ExplainLevel::Coarse)?;
-    println!("{}", explanation.display());
-
-    Ok(())
-}
+```bash
+pip install anamdb
 ```
 
----
+```python
+from anamdb import AnamClient
 
-## Architecture
-
-```
- ┌──────────────────────────────────────────────────────────────────┐
- │                     AnamDB v1.0 Coordinator                      │
- │                                                                  │
- │  ┌─────────────┐ ┌──────────────┐ ┌──────────────────────────┐   │
- │  │ BCNF Policy │ │ Distributed  │ │ Global Lineage           │   │
- │  │ Catalog     │ │ Optimizer    │ │ Tracer                   │   │
- │  └──────┬──────┘ └──────┬───────┘ └──────────┬───────────────┘   │
- │         ▼               ▼                     ▼                  │
- │  ┌─────────────────────────────────────────────────────────────┐ │
- │  │                    Task Router                              │ │
- │  │     Perception → Edge  |  Symbolic → Core  |  Mixed → Hybrid│ │
- │  └──────┬────────────────┬────────────────────┬────────────────┘ │
- └─────────┼────────────────┼────────────────────┼──────────────────┘
-           │                │                    │
-    ┌──────▼──────┐  ┌──────▼──────┐  ┌──────────▼──────┐
-    │  Edge Node  │  │  Core Node  │  │  Hybrid Node    │
-    │  NPU + 4GB  │  │  64GB RAM   │  │  GPU + 32GB     │
-    │             │  │             │  │                 │
-    │ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────────┐ │
-    │ │ 5-Stage │ │  │ │ 5-Stage │ │  │ │ 5-Stage     │ │
-    │ │Pipeline │ │  │ │Pipeline │ │  │ │ Pipeline    │ │
-    │ └─────────┘ │  │ └─────────┘ │  │ └─────────────┘ │
-    └─────────────┘  └─────────────┘  └─────────────────┘
+async with AnamClient("127.0.0.1:8080") as client:
+    result = await client.query("SELECT * FROM txns LIMIT 10")
+    health = await client.health()
 ```
 
----
+### Docker
 
-## Test Suite
+```bash
+docker run -p 8080:8080 ghcr.io/anamdb/anam-db
+```
+
+Or with Docker Compose:
+
+```bash
+git clone https://github.com/AnamDB/anam-db && cd anam-db
+docker compose up
+```
+
+### Rust library
+
+```toml
+[dependencies]
+anamdb = "1.0"
+```
+
+## How it works
+
+AnamDB's 5-stage pipeline processes every query through:
+
+1. **Parse** — SQL is parsed and extended with model-aware operators
+2. **Logic** — Datalog rules are compiled into query filters via differentiable semiring evaluation
+3. **Optimize** — Pareto frontier selects the best model across latency, accuracy, and cost
+4. **Execute** — Apache DataFusion runs the query with ONNX model inference inlined as UDFs
+5. **Explain** — Semiring provenance traces every output row to source records, rules, and model versions
+
+| Layer | Technology |
+|:---|:---|
+| Kernel | Rust 2024 + Tokio |
+| Query engine | Apache DataFusion |
+| Logic | Differentiable Datalog (semiring provenance) |
+| Models | ONNX Runtime — CPU, CUDA, Metal, NPU |
+| Storage | Lance (Arrow-backed columnar + vector) |
+| Wire protocol | JSON-over-TCP |
+
+## Status
+
+AnamDB is in active development. The core engine is functional and tested:
 
 ```
 $ cargo test
-
-test result: ok. 38 passed; 0 failed; 0 ignored
+test result: ok. 54 passed; 0 failed; 0 ignored
 ```
 
 ## License
 
-AnamDB is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-<b>Every other database stores data. AnamDB reasons about it.</b>
-</p>
+Apache License 2.0. See [LICENSE](LICENSE) for details.

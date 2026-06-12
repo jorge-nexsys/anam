@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#0F172A"/>
+  <circle cx="256" cy="256" r="240" stroke="url(#ring)" stroke-width="4"/>
+
+  <!-- Database cylinder (bottom layer) -->
+  <ellipse cx="256" cy="320" rx="100" ry="28" fill="none" stroke="#06B6D4" stroke-width="3.5" opacity="0.6"/>
+  <line x1="156" y1="280" x2="156" y2="320" stroke="#06B6D4" stroke-width="3.5" opacity="0.6"/>
+  <line x1="356" y1="280" x2="356" y2="320" stroke="#06B6D4" stroke-width="3.5" opacity="0.6"/>
+  <ellipse cx="256" cy="280" rx="100" ry="28" fill="none" stroke="#06B6D4" stroke-width="3.5" opacity="0.8"/>
+  <line x1="156" y1="240" x2="156" y2="280" stroke="#06B6D4" stroke-width="3.5" opacity="0.8"/>
+  <line x1="356" y1="240" x2="356" y2="280" stroke="#06B6D4" stroke-width="3.5" opacity="0.8"/>
+  <ellipse cx="256" cy="240" rx="100" ry="28" fill="none" stroke="#06B6D4" stroke-width="3.5"/>
+
+  <!-- Neural network nodes -->
+  <!-- Input layer -->
+  <circle cx="200" cy="140" r="10" fill="#4F46E5"/>
+  <circle cx="256" cy="120" r="10" fill="#4F46E5"/>
+  <circle cx="312" cy="140" r="10" fill="#4F46E5"/>
+
+  <!-- Hidden layer -->
+  <circle cx="216" cy="185" r="8" fill="#7C3AED"/>
+  <circle cx="256" cy="175" r="8" fill="#7C3AED"/>
+  <circle cx="296" cy="185" r="8" fill="#7C3AED"/>
+
+  <!-- Connections input → hidden -->
+  <line x1="200" y1="148" x2="216" y2="179" stroke="#818CF8" stroke-width="1.5" opacity="0.5"/>
+  <line x1="200" y1="148" x2="256" y2="169" stroke="#818CF8" stroke-width="1.5" opacity="0.3"/>
+  <line x1="256" y1="128" x2="216" y2="179" stroke="#818CF8" stroke-width="1.5" opacity="0.3"/>
+  <line x1="256" y1="128" x2="256" y2="169" stroke="#818CF8" stroke-width="1.5" opacity="0.5"/>
+  <line x1="256" y1="128" x2="296" y2="179" stroke="#818CF8" stroke-width="1.5" opacity="0.3"/>
+  <line x1="312" y1="148" x2="256" y2="169" stroke="#818CF8" stroke-width="1.5" opacity="0.3"/>
+  <line x1="312" y1="148" x2="296" y2="179" stroke="#818CF8" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Connections hidden → database -->
+  <line x1="216" y1="193" x2="206" y2="216" stroke="#06B6D4" stroke-width="1.5" opacity="0.4"/>
+  <line x1="256" y1="183" x2="256" y2="216" stroke="#06B6D4" stroke-width="1.5" opacity="0.4"/>
+  <line x1="296" y1="193" x2="306" y2="216" stroke="#06B6D4" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Logic/Datalog symbol: ∀ at center -->
+  <text x="256" y="285" text-anchor="middle" font-size="32" font-family="serif" fill="#A78BFA" opacity="0.7">∀</text>
+
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+</svg>
